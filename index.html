@@ -1,865 +1,352 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pointage Chantier - S2E</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --color-green: #669900;
-            --color-purple: #9966CC;
-            --color-light-green: #f0f4e8;
-            --color-light-purple: #f5f1fa;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f5f5f5;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #669900 0%, #7aa817 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h1 {
-            font-size: 28px;
-        }
-
-        .header-right {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #669900;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5a8700;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 153, 0, 0.3);
-        }
-
-        .btn-admin {
-            background: #9966CC;
-            color: white;
-        }
-
-        .btn-admin:hover {
-            background: #8855bb;
-        }
-
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #d0d0d0;
-        }
-
-        .btn-danger {
-            background: #ff4444;
-            color: white;
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-
-        .btn-danger:hover {
-            background: #cc0000;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* Login Screen */
-        .login-container {
-            max-width: 450px;
-            margin: 100px auto;
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }
-
-        .login-logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .logo-text {
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: -1px;
-            margin-bottom: 10px;
-        }
-
-        .logo-s { color: #669900; }
-        .logo-e { color: #9966CC; }
-
-        .login-subtitle {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .login-title {
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            color: #669900;
-            margin-bottom: 30px;
-        }
-
-        .login-section {
-            margin-bottom: 30px;
-        }
-
-        .login-section h2 {
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-            color: #555;
-            font-weight: 500;
-        }
-
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #669900;
-        }
-
-        .divider {
-            text-align: center;
-            margin: 30px 0;
-            font-size: 12px;
-            color: #999;
-        }
-
-        .divider::before {
-            content: '';
-            display: block;
-            height: 1px;
-            background: #ddd;
-            margin-bottom: 10px;
-        }
-
-        .hint {
-            font-size: 12px;
-            color: #999;
-            margin-top: 10px;
-            text-align: center;
-        }
-
-        /* Main App */
-        .header-admin {
-            background: linear-gradient(135deg, #9966CC 0%, #a366dd 100%);
-        }
-
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .card h2 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #333;
-            border-bottom: 2px solid #669900;
-            padding-bottom: 10px;
-        }
-
-        .week-navigation {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            gap: 20px;
-        }
-
-        .week-title {
-            text-align: center;
-            font-weight: 600;
-            color: #333;
-            flex: 1;
-        }
-
-        .day-card {
-            background: #f0f4e8;
-            border-left: 4px solid #669900;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 6px;
-        }
-
-        .day-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .day-name {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .day-date {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .day-total {
-            text-align: right;
-        }
-
-        .day-total-label {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .day-total-hours {
-            font-size: 28px;
-            font-weight: bold;
-            color: #669900;
-        }
-
-        .pointage-item {
-            background: white;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-left: 4px solid #669900;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .pointage-info {
-            flex: 1;
-        }
-
-        .pointage-code {
-            font-weight: bold;
-            color: #669900;
-            font-size: 12px;
-        }
-
-        .pointage-name {
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
-        }
-
-        .pointage-hours {
-            font-weight: bold;
-            font-size: 18px;
-            color: #333;
-            margin-right: 15px;
-        }
-
-        .add-pointage-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .add-pointage-row select {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .week-total {
-            background: linear-gradient(135deg, #f0f4e8 0%, #e8f0d8 100%);
-            border: 2px solid #669900;
-            padding: 20px;
-            border-radius: 6px;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .week-total-label {
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        .week-total-hours {
-            font-size: 32px;
-            font-weight: bold;
-            color: #669900;
-        }
-
-        .plans-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .plan-card {
-            background: #f0f4e8;
-            border: 2px solid #669900;
-            border-radius: 6px;
-            padding: 15px;
-        }
-
-        .plan-code {
-            font-weight: bold;
-            color: #669900;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-
-        .plan-name {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-
-        .plan-list {
-            font-size: 12px;
-            color: #669900;
-            line-height: 1.6;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        table th {
-            background: #f5f5f5;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #ddd;
-            font-size: 13px;
-        }
-
-        table td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
-        }
-
-        table tr:hover {
-            background: #f9f9f9;
-        }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .summary-card {
-            background: #f5f1fa;
-            border: 2px solid #9966CC;
-            border-radius: 6px;
-            padding: 15px;
-        }
-
-        .summary-name {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .summary-stat {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .summary-stat strong {
-            color: #9966CC;
-        }
-
-        @media (max-width: 768px) {
-            .week-navigation {
-                flex-direction: column;
-            }
-
-            .header-content {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .day-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .plans-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pointage Chantier - SP2E</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f5f2;color:#222}
+.container{max-width:1100px;margin:0 auto;padding:16px}
+.header{background:linear-gradient(135deg,#669900,#7aa817);color:#fff;padding:18px 16px}
+.header-in{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.header h1{font-size:22px}
+.header .sub{font-size:12px;opacity:.9}
+.header-admin{background:linear-gradient(135deg,#9966CC,#a366dd)}
+.btn{padding:10px 16px;border:0;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit}
+.btn-primary{background:#669900;color:#fff}
+.btn-primary:hover{background:#5a8700}
+.btn-admin{background:#9966CC;color:#fff}
+.btn-admin:hover{background:#8855bb}
+.btn-secondary{background:#e6e6e6;color:#333}
+.btn-secondary:hover{background:#d6d6d6}
+.btn-light{background:rgba(255,255,255,.2);color:#fff}
+.btn-danger{background:#fff;color:#c62828;border:1px solid #f0bcbc;padding:6px 10px;font-size:12px}
+.btn-danger:hover{background:#ffecec}
+.login{max-width:420px;margin:40px auto;background:#fff;padding:32px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.logo{text-align:center;margin-bottom:24px}
+.logo-text{font-size:34px;font-weight:800;letter-spacing:-1px}
+.logo-a{color:#669900}.logo-b{color:#9966CC}
+.logo .sub{color:#666;font-size:13px;margin-top:6px}
+.login h2{font-size:15px;margin-bottom:14px}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:13px;color:#555;margin-bottom:5px;font-weight:500}
+input,select{width:100%;padding:11px;border:2px solid #ddd;border-radius:6px;font-size:15px;font-family:inherit;background:#fff}
+input:focus,select:focus{outline:0;border-color:#669900}
+.hint{font-size:12px;color:#999;text-align:center;margin-top:10px}
+.divider{height:1px;background:#e5e5e5;margin:26px 0}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.card h2{font-size:17px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #669900}
+.weeknav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.weeknav .title{font-weight:700;text-align:center;flex:1;min-width:200px}
+.day{background:#f2f6ea;border-left:4px solid #669900;border-radius:6px;padding:16px;margin-bottom:14px}
+.day-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px}
+.day-name{font-size:17px;font-weight:700}
+.day-date{font-size:12px;color:#666}
+.day-tot{font-size:26px;font-weight:800;color:#669900;text-align:right;line-height:1}
+.day-tot small{display:block;font-size:11px;color:#666;font-weight:500}
+.line{background:#fff;border-left:4px solid #669900;border-radius:4px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.line .info{flex:1;min-width:0}
+.line .code{font-size:12px;font-weight:700;color:#669900}
+.line .nom{font-size:14px;font-weight:600}
+.line .h{font-weight:700;font-size:17px;white-space:nowrap}
+.empty{color:#999;font-size:13px;padding:4px 0 10px}
+.addrow{display:flex;gap:8px;flex-wrap:wrap}
+.addrow select{flex:2;min-width:150px}
+.addrow input{flex:1;min-width:90px}
+.addrow .btn{flex:0 0 auto}
+.wtot{background:#e9f0da;border:2px solid #669900;border-radius:6px;padding:16px;text-align:center;margin-top:6px}
+.wtot .n{font-size:30px;font-weight:800;color:#669900}
+.wtot .l{font-size:13px;color:#555}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.plan{background:#f2f6ea;border:2px solid #cfe0ae;border-radius:6px;padding:14px}
+.plan .code{font-weight:700;color:#669900;font-size:13px}
+.plan .nom{font-weight:600;margin-bottom:8px}
+.plan .l{font-size:12px;color:#4c7300;line-height:1.7}
+.sum{background:#f6f2fb;border:2px solid #d9c7ee;border-radius:6px;padding:14px}
+.sum .n{font-weight:700;margin-bottom:8px}
+.sum .s{font-size:13px;color:#555}
+.sum .s b{color:#9966CC}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{background:#f5f5f5;padding:10px;text-align:left;font-size:13px;border-bottom:2px solid #ddd;white-space:nowrap}
+td{padding:10px;border-bottom:1px solid #eee;font-size:13px}
+tr:hover td{background:#fafafa}
+.warn{background:#fff6e0;border:1px solid #f0d68a;color:#7a5b00;padding:10px 12px;border-radius:6px;font-size:13px;margin-bottom:14px}
+@media(max-width:640px){.day-h{flex-direction:row}.header h1{font-size:19px}}
+</style>
 </head>
 <body>
-    <div id="app"></div>
+<div id="app"></div>
+<script>
+"use strict";
 
-    <script>
-        // ===== STATE =====
-        const state = {
-            currentUser: null,
-            isAdmin: false,
-            pointages: [],
-            currentWeek: getMonday(new Date())
-        };
+/* ====== DONNÉES À PERSONNALISER ====== */
+var OUVRIERS = [
+  {id:1, nom:"Nadeem",      mdp:"1234"},
+  {id:2, nom:"Moujibullah", mdp:"1234"},
+  {id:3, nom:"Rock",        mdp:"1234"},
+  {id:4, nom:"Yaya",        mdp:"1234"},
+  {id:5, nom:"Bogdan",      mdp:"1234"},
+  {id:6, nom:"Yaacoub",     mdp:"1234"},
+  {id:7, nom:"Sardasayed",  mdp:"1234"}
+];
+var MDP_ADMIN = "admin123";
+var CHANTIERS = [
+  {id:1, code:"016", nom:"Paris 15", plans:["Plan_Detail.pdf","Facade.pdf"]},
+  {id:2, code:"011", nom:"Evry",     plans:["Plan_Fondations.pdf","Toiture.pdf"]},
+  {id:3, code:"033", nom:"P10",      plans:["Plan_P10.pdf","Electricite.pdf"]},
+  {id:4, code:"043", nom:"Gonesse",  plans:["Plan_Gonesse.pdf","Cloisons.pdf"]}
+];
+/* ===================================== */
 
-        const OUVRIERS = [
-            { id: 1, nom: 'Nadeem', password: '1234' },
-            { id: 2, nom: 'Moujibullah', password: '1234' },
-            { id: 3, nom: 'Rock', password: '1234' },
-            { id: 4, nom: 'Yaya', password: '1234' },
-            { id: 5, nom: 'Bogdan', password: '1234' },
-            { id: 6, nom: 'Yaacoub', password: '1234' },
-            { id: 7, nom: 'Sardasayed', password: '1234' }
-        ];
+var state = {user:null, admin:false, pointages:[], lundi:lundiDe(new Date()), stockageOk:true};
+var JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 
-        const CHANTIERS = [
-            { id: 1, code: '016', nom: 'Paris 15', plans: ['Plan_Détail.pdf', 'Façade.pdf'] },
-            { id: 2, code: '011', nom: 'Evry', plans: ['Plan_Fondations.pdf', 'Toiture.pdf'] },
-            { id: 3, code: '033', nom: 'P10', plans: ['Plan_P10.pdf', 'Électricité.pdf'] },
-            { id: 4, code: '043', nom: 'Gonesse', plans: ['Plan_Gonesse.pdf', 'Cloisons.pdf'] }
-        ];
+/* ---------- Dates ---------- */
+function lundiDe(d){
+  var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var j = x.getDay();
+  x.setDate(x.getDate() - (j === 0 ? 6 : j - 1));
+  return x;
+}
+function cle(d){ // AAAA-MM-JJ : cle de tri fiable
+  var m = d.getMonth()+1, j = d.getDate();
+  return d.getFullYear()+"-"+(m<10?"0":"")+m+"-"+(j<10?"0":"")+j;
+}
+function affiche(k){ var p = k.split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
+function jourPlus(d,n){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
+function semaine(lundi){ var t=[]; for(var i=0;i<6;i++) t.push(jourPlus(lundi,i)); return t; }
 
-        // ===== UTILITIES =====
-        function getMonday(date) {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(d.setDate(diff));
-        }
+/* ---------- Stockage ---------- */
+function charger(){
+  try{
+    var s = window.localStorage.getItem("sp2e_pointages");
+    if(s) state.pointages = JSON.parse(s);
+  }catch(e){ state.stockageOk = false; }
+}
+function sauver(){
+  try{ window.localStorage.setItem("sp2e_pointages", JSON.stringify(state.pointages)); }
+  catch(e){ state.stockageOk = false; }
+}
 
-        function getDaysOfWeek(monday) {
-            const days = [];
-            for (let i = 0; i < 6; i++) {
-                const date = new Date(monday);
-                date.setDate(date.getDate() + i);
-                days.push(date);
-            }
-            return days;
-        }
+/* ---------- Utilitaires ---------- */
+function ouvrier(id){ for(var i=0;i<OUVRIERS.length;i++) if(OUVRIERS[i].id===id) return OUVRIERS[i]; return null; }
+function chantier(id){ for(var i=0;i<CHANTIERS.length;i++) if(CHANTIERS[i].id===id) return CHANTIERS[i]; return null; }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function arrondi(n){ return Math.round(n*100)/100; }
 
-        function loadState() {
-            const saved = localStorage.getItem('pointages_app');
-            if (saved) {
-                state.pointages = JSON.parse(saved);
-            }
-        }
+/* ---------- Actions ---------- */
+function connexion(){
+  var nom = (document.getElementById("f-nom").value||"").trim();
+  var mdp = (document.getElementById("f-mdp").value||"").trim();
+  if(!nom || !mdp){ alert("Merci de saisir votre nom et votre mot de passe."); return; }
+  var o = null;
+  for(var i=0;i<OUVRIERS.length;i++){
+    if(OUVRIERS[i].nom.toLowerCase() === nom.toLowerCase()) o = OUVRIERS[i];
+  }
+  if(!o || o.mdp !== mdp){ alert("Nom ou mot de passe incorrect."); return; }
+  state.user = o; state.admin = false; state.lundi = lundiDe(new Date());
+  dessiner();
+}
+function connexionAdmin(){
+  var mdp = (document.getElementById("f-admin").value||"").trim();
+  if(mdp !== MDP_ADMIN){ alert("Mot de passe administrateur incorrect."); return; }
+  state.admin = true; state.user = null;
+  dessiner();
+}
+function deconnexion(){ state.user = null; state.admin = false; dessiner(); }
+function semPrec(){ state.lundi = jourPlus(state.lundi,-7); dessiner(); }
+function semSuiv(){ state.lundi = jourPlus(state.lundi,7); dessiner(); }
+function semAuj(){ state.lundi = lundiDe(new Date()); dessiner(); }
 
-        function saveState() {
-            localStorage.setItem('pointages_app', JSON.stringify(state.pointages));
-        }
+function ajouter(dateCle){
+  var sel = document.getElementById("ch-"+dateCle);
+  var inp = document.getElementById("hr-"+dateCle);
+  var cid = parseInt(sel.value,10);
+  var h = parseFloat(String(inp.value).replace(",","."));
+  if(!cid){ alert("Choisissez un chantier."); sel.focus(); return; }
+  if(!(h > 0)){ alert("Saisissez un nombre d'heures (ex : 8 ou 7.5)."); inp.focus(); return; }
+  if(h > 24){ alert("Maximum 24 heures par ligne."); inp.focus(); return; }
+  state.pointages.push({id:Date.now()+Math.floor(Math.random()*1000), ouvrierId:state.user.id, chantierId:cid, heures:arrondi(h), date:dateCle});
+  sauver(); dessiner();
+}
+function supprimer(id){
+  if(!confirm("Supprimer cette ligne ?")) return;
+  var t=[]; for(var i=0;i<state.pointages.length;i++) if(state.pointages[i].id!==id) t.push(state.pointages[i]);
+  state.pointages = t; sauver(); dessiner();
+}
 
-        // ===== EVENT HANDLERS =====
-        function handleLoginSubmit() {
-            const nom = document.getElementById('login-nom')?.value.trim();
-            const password = document.getElementById('login-password')?.value.trim();
-            
-            if (!nom || !password) {
-                alert('Veuillez remplir tous les champs');
-                return;
-            }
+/* ---------- Export Excel (sans librairie externe) ---------- */
+function exportExcel(){
+  if(state.pointages.length === 0){ alert("Aucun pointage à exporter."); return; }
+  var lignes = state.pointages.slice().sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var h = '<table border="1"><tr>'
+        + '<th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th></tr>';
+  var total = 0;
+  for(var i=0;i<lignes.length;i++){
+    var p = lignes[i], o = ouvrier(p.ouvrierId), c = chantier(p.chantierId);
+    total += p.heures;
+    h += '<tr><td>'+affiche(p.date)+'</td><td>'+esc(o?o.nom:"")+'</td><td>'+esc(c?c.code:"")
+       + '</td><td>'+esc(c?c.nom:"")+'</td><td>'+p.heures+'</td></tr>';
+  }
+  h += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(total)+'</b></td></tr></table>';
 
-            const ouvrier = OUVRIERS.find(o => o.nom.toLowerCase() === nom.toLowerCase());
-            if (ouvrier && ouvrier.password === password) {
-                state.currentUser = ouvrier;
-                state.isAdmin = false;
-                render();
-            } else {
-                alert('Nom ou mot de passe incorrect');
-            }
-        }
+  var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
+          + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+          + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+          + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
+          + '</head><body>'+h+'</body></html>';
 
-        function handleAdminLoginSubmit() {
-            const password = document.getElementById('admin-password')?.value.trim();
-            if (password === 'admin123') {
-                state.isAdmin = true;
-                state.currentUser = null;
-                render();
-            } else {
-                alert('Mot de passe incorrect');
-            }
-        }
+  var blob = new Blob(["\ufeff"+doc], {type:"application/vnd.ms-excel;charset=utf-8"});
+  var d = new Date();
+  var nom = "Pointages_"+cle(d)+".xls";
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = nom;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
 
-        function handleLogout() {
-            state.currentUser = null;
-            state.isAdmin = false;
-            render();
-        }
+/* ---------- Rendu ---------- */
+function dessiner(){
+  var app = document.getElementById("app");
+  if(state.admin) app.innerHTML = vueAdmin();
+  else if(state.user) app.innerHTML = vueOuvrier();
+  else { app.innerHTML = vueLogin(); var n = document.getElementById("f-nom"); if(n) n.focus(); }
+}
 
-        function handlePrevWeek() {
-            state.currentWeek = new Date(state.currentWeek.getTime() - 7*24*60*60*1000);
-            render();
-        }
+function vueLogin(){
+  return ''
+  + '<div class="login">'
+  +   '<div class="logo"><div class="logo-text"><span class="logo-a">SP</span><span class="logo-b">2E</span></div>'
+  +     '<div class="sub">Société Parisienne d\'Équipement Électrique</div></div>'
+  +   '<h2>Connexion ouvrier</h2>'
+  +   '<div class="fg"><label>Nom</label><input type="text" id="f-nom" autocomplete="username" placeholder="Ex : Nadeem"></div>'
+  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-mdp" autocomplete="current-password" placeholder="****"></div>'
+  +   '<button type="button" class="btn btn-primary" style="width:100%" onclick="connexion()">Se connecter</button>'
+  +   '<div class="hint">Mot de passe par défaut : 1234</div>'
+  +   '<div class="divider"></div>'
+  +   '<h2>Accès administrateur</h2>'
+  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-admin" placeholder="****"></div>'
+  +   '<button type="button" class="btn btn-admin" style="width:100%" onclick="connexionAdmin()">Entrer</button>'
+  + '</div>';
+}
 
-        function handleNextWeek() {
-            state.currentWeek = new Date(state.currentWeek.getTime() + 7*24*60*60*1000);
-            render();
-        }
+function vueOuvrier(){
+  var jours = semaine(state.lundi);
+  var h = ''
+  + '<div class="header"><div class="header-in">'
+  +   '<div><h1>Pointage chantier</h1><div class="sub">SP2E &middot; '+esc(state.user.nom)+'</div></div>'
+  +   '<button type="button" class="btn btn-light" onclick="deconnexion()">Déconnexion</button>'
+  + '</div></div><div class="container">';
 
-        function handleAddPointage(date, chantierId) {
-            const heures = prompt('Nombre d\'heures:');
-            if (heures && !isNaN(heures)) {
-                state.pointages.push({
-                    id: Date.now(),
-                    ouvrierId: state.currentUser.id,
-                    chantierId: parseInt(chantierId),
-                    heures: parseFloat(heures),
-                    date: date.toLocaleDateString('fr-FR')
-                });
-                saveState();
-                render();
-            }
-        }
+  if(!state.stockageOk) h += '<div class="warn">Attention : la sauvegarde locale est bloquée par le navigateur. Les heures saisies seront perdues en fermant la page.</div>';
 
-        function handleDeletePointage(id) {
-            if (confirm('Supprimer ce pointage ?')) {
-                state.pointages = state.pointages.filter(p => p.id !== id);
-                saveState();
-                render();
-            }
-        }
+  h += '<div class="card">'
+    +   '<div class="weeknav">'
+    +     '<button type="button" class="btn btn-secondary" onclick="semPrec()">&larr; Semaine précédente</button>'
+    +     '<div class="title">Semaine du '+affiche(cle(jours[0]))+' au '+affiche(cle(jours[5]))+'</div>'
+    +     '<button type="button" class="btn btn-secondary" onclick="semSuiv()">Semaine suivante &rarr;</button>'
+    +   '</div>'
+    +   '<div style="text-align:center;margin-bottom:16px"><button type="button" class="btn btn-secondary" onclick="semAuj()">Revenir à cette semaine</button></div>';
 
-        function handleExportExcel() {
-            const data = state.pointages.map(p => ({
-                Date: p.date,
-                'Nom Ouvrier': OUVRIERS.find(o => o.id === p.ouvrierId)?.nom || '',
-                'Code Affaire': CHANTIERS.find(c => c.id === p.chantierId)?.code || '',
-                'Chantier': CHANTIERS.find(c => c.id === p.chantierId)?.nom || '',
-                'Heures': p.heures
-            }));
+  var totalSem = 0;
+  for(var i=0;i<jours.length;i++){
+    var k = cle(jours[i]);
+    var duJour = [];
+    var totJour = 0;
+    for(var j=0;j<state.pointages.length;j++){
+      var p = state.pointages[j];
+      if(p.ouvrierId === state.user.id && p.date === k){ duJour.push(p); totJour += p.heures; }
+    }
+    totalSem += totJour;
 
-            const ws = XLSX.utils.json_to_sheet(data);
-            ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 8 }];
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
-            XLSX.writeFile(wb, `Pointages_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.xlsx`);
-        }
+    h += '<div class="day">'
+      +   '<div class="day-h"><div><div class="day-name">'+JOURS[i]+'</div><div class="day-date">'+affiche(k)+'</div></div>'
+      +   '<div class="day-tot"><small>Total du jour</small>'+arrondi(totJour)+' h</div></div>';
 
-        // ===== RENDER =====
-        function render() {
-            const app = document.getElementById('app');
+    if(duJour.length === 0) h += '<div class="empty">Aucune heure saisie.</div>';
+    for(var m=0;m<duJour.length;m++){
+      var pp = duJour[m], cc = chantier(pp.chantierId);
+      h += '<div class="line"><div class="info"><div class="code">'+esc(cc?cc.code:"?")+'</div>'
+        +  '<div class="nom">'+esc(cc?cc.nom:"Chantier inconnu")+'</div></div>'
+        +  '<div class="h">'+pp.heures+' h</div>'
+        +  '<button type="button" class="btn btn-danger" onclick="supprimer('+pp.id+')">Supprimer</button></div>';
+    }
 
-            if (!state.currentUser && !state.isAdmin) {
-                app.innerHTML = renderLogin();
-                attachLoginListeners();
-            } else if (state.currentUser) {
-                app.innerHTML = renderOuvrier();
-                attachOuvrierListeners();
-            } else if (state.isAdmin) {
-                app.innerHTML = renderAdmin();
-                attachAdminListeners();
-            }
-        }
+    h += '<div class="addrow">'
+      +    '<select id="ch-'+k+'"><option value="">Choisir un chantier</option>';
+    for(var n=0;n<CHANTIERS.length;n++) h += '<option value="'+CHANTIERS[n].id+'">'+esc(CHANTIERS[n].code+" - "+CHANTIERS[n].nom)+'</option>';
+    h +=     '</select>'
+      +    '<input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures">'
+      +    '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')">Ajouter</button>'
+      +  '</div></div>';
+  }
 
-        function renderLogin() {
-            return `
-                <div class="login-container">
-                    <div class="login-logo">
-                        <div class="logo-text"><span class="logo-s">SP</span><span class="logo-e">2E</span></div>
-                        <div class="login-subtitle">Société Parisienne d'Équipement Électrique</div>
-                    </div>
-                    <h1 class="login-title">Pointage Chantier</h1>
+  h += '<div class="wtot"><div class="l">Total de la semaine</div><div class="n">'+arrondi(totalSem)+' h</div></div>'
+    +  '</div>';
 
-                    <div class="login-section">
-                        <h2>Connexion Ouvrier</h2>
-                        <div class="form-group">
-                            <label>Votre nom</label>
-                            <input type="text" id="login-nom" placeholder="Ex: Nadeem">
-                        </div>
-                        <div class="form-group">
-                            <label>Mot de passe</label>
-                            <input type="password" id="login-password" placeholder="****">
-                        </div>
-                        <button class="btn btn-primary" style="width:100%;" onclick="handleLoginSubmit()">Se connecter</button>
-                        <div class="hint">Mot de passe par défaut: 1234</div>
-                    </div>
+  h += '<div class="card"><h2>Plans des chantiers</h2><div class="grid">';
+  for(var q=0;q<CHANTIERS.length;q++){
+    var c2 = CHANTIERS[q];
+    h += '<div class="plan"><div class="code">'+esc(c2.code)+'</div><div class="nom">'+esc(c2.nom)+'</div><div class="l">';
+    for(var r=0;r<c2.plans.length;r++) h += esc(c2.plans[r]) + (r<c2.plans.length-1 ? '<br>' : '');
+    h += '</div></div>';
+  }
+  h += '</div></div></div>';
+  return h;
+}
 
-                    <div class="divider"></div>
+function vueAdmin(){
+  var lignes = state.pointages.slice().sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  var h = ''
+  + '<div class="header header-admin"><div class="header-in">'
+  +   '<div><h1>Administration</h1><div class="sub">SP2E &middot; gestion des pointages</div></div>'
+  +   '<button type="button" class="btn btn-light" onclick="deconnexion()">Déconnexion</button>'
+  + '</div></div><div class="container">'
+  + '<div class="card"><button type="button" class="btn btn-admin" onclick="exportExcel()">Exporter vers Excel</button></div>'
+  + '<div class="card"><h2>Tous les pointages ('+lignes.length+')</h2>';
 
-                    <div class="login-section">
-                        <h2>🔐 Admin</h2>
-                        <div class="form-group">
-                            <label>Mot de passe admin</label>
-                            <input type="password" id="admin-password" placeholder="****">
-                        </div>
-                        <button class="btn btn-admin" style="width:100%;" onclick="handleAdminLoginSubmit()">Accès Admin</button>
-                    </div>
-                </div>
-            `;
-        }
+  if(lignes.length === 0){
+    h += '<div class="empty">Aucun pointage enregistré.</div>';
+  } else {
+    h += '<div class="tw"><table><thead><tr><th>Date</th><th>Ouvrier</th><th>Code</th><th>Chantier</th><th>Heures</th><th></th></tr></thead><tbody>';
+    for(var i=0;i<lignes.length;i++){
+      var p = lignes[i], o = ouvrier(p.ouvrierId), c = chantier(p.chantierId);
+      h += '<tr><td>'+affiche(p.date)+'</td><td><b>'+esc(o?o.nom:"?")+'</b></td>'
+        +  '<td style="color:#669900;font-weight:700">'+esc(c?c.code:"?")+'</td><td>'+esc(c?c.nom:"?")+'</td>'
+        +  '<td><b>'+p.heures+' h</b></td>'
+        +  '<td><button type="button" class="btn btn-danger" onclick="supprimer('+p.id+')">Supprimer</button></td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div><div class="card"><h2>Récapitulatif par ouvrier</h2><div class="grid">';
+  for(var k=0;k<OUVRIERS.length;k++){
+    var tot = 0, nb = 0;
+    for(var j=0;j<state.pointages.length;j++){
+      if(state.pointages[j].ouvrierId === OUVRIERS[k].id){ tot += state.pointages[j].heures; nb++; }
+    }
+    h += '<div class="sum"><div class="n">'+esc(OUVRIERS[k].nom)+'</div>'
+      +  '<div class="s">Lignes saisies : <b>'+nb+'</b></div>'
+      +  '<div class="s">Total : <b>'+arrondi(tot)+' h</b></div></div>';
+  }
+  h += '</div></div></div>';
+  return h;
+}
 
-        function renderOuvrier() {
-            const daysOfWeek = getDaysOfWeek(state.currentWeek);
-            const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-
-            let html = `
-                <div class="header">
-                    <div class="header-content">
-                        <h1>Pointage Chantier</h1>
-                        <div class="header-right">
-                            <span>${state.currentUser.nom}</span>
-                            <button class="btn btn-secondary" onclick="handleLogout()">Déconnexion</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="container">
-                    <div class="card">
-                        <div class="week-navigation">
-                            <button class="btn btn-secondary" onclick="handlePrevWeek()">← Semaine précédente</button>
-                            <div class="week-title">
-                                Semaine du ${daysOfWeek[0].toLocaleDateString('fr-FR')} au ${daysOfWeek[5].toLocaleDateString('fr-FR')}
-                            </div>
-                            <button class="btn btn-secondary" onclick="handleNextWeek()">Semaine suivante →</button>
-                        </div>
-            `;
-
-            daysOfWeek.forEach((date, dayIndex) => {
-                const dayPointages = state.pointages.filter(p =>
-                    p.ouvrierId === state.currentUser.id &&
-                    p.date === date.toLocaleDateString('fr-FR')
-                );
-                const dayTotal = dayPointages.reduce((sum, p) => sum + p.heures, 0);
-
-                html += `
-                    <div class="day-card">
-                        <div class="day-header">
-                            <div>
-                                <div class="day-name">${dayNames[dayIndex]}</div>
-                                <div class="day-date">${date.toLocaleDateString('fr-FR')}</div>
-                            </div>
-                            <div class="day-total">
-                                <div class="day-total-label">Total du jour</div>
-                                <div class="day-total-hours">${dayTotal}h</div>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            ${dayPointages.length === 0 ? '<p style="color: #999; font-size: 13px;">Aucun pointage</p>' : ''}
-                            ${dayPointages.map(p => {
-                                const chantier = CHANTIERS.find(c => c.id === p.chantierId);
-                                return `
-                                    <div class="pointage-item">
-                                        <div class="pointage-info">
-                                            <div class="pointage-code">${chantier?.code}</div>
-                                            <div class="pointage-name">${chantier?.nom}</div>
-                                        </div>
-                                        <div class="pointage-hours">${p.heures}h</div>
-                                        <button class="btn btn-danger" onclick="handleDeletePointage(${p.id})">Supprimer</button>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-
-                        <div class="add-pointage-row">
-                            <select onchange="if(this.value) handleAddPointage(new Date('${date.toISOString()}'), this.value); this.value='';">
-                                <option value="">+ Ajouter un chantier</option>
-                                ${CHANTIERS.map(c => `<option value="${c.id}">${c.code} - ${c.nom}</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>
-                `;
-            });
-
-            const weekTotal = state.pointages.filter(p => {
-                const pDate = new Date(p.date.split('/').reverse().join('-'));
-                return p.ouvrierId === state.currentUser.id && pDate >= state.currentWeek && pDate < new Date(state.currentWeek.getTime() + 7*24*60*60*1000);
-            }).reduce((sum, p) => sum + p.heures, 0);
-
-            html += `
-                        <div class="week-total">
-                            <div class="week-total-label">Total semaine</div>
-                            <div class="week-total-hours">${weekTotal}h</div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h2>Plans Chantier</h2>
-                        <div class="plans-grid">
-                            ${CHANTIERS.map(c => `
-                                <div class="plan-card">
-                                    <div class="plan-code">${c.code}</div>
-                                    <div class="plan-name">${c.nom}</div>
-                                    <div class="plan-list">
-                                        ${c.plans.map(p => `📄 ${p}`).join('<br>')}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            return html;
-        }
-
-        function renderAdmin() {
-            let html = `
-                <div class="header header-admin">
-                    <div class="header-content">
-                        <h1>Admin - Gestion Pointages</h1>
-                        <button class="btn btn-secondary" onclick="handleLogout()">Déconnexion</button>
-                    </div>
-                </div>
-
-                <div class="container">
-                    <div class="card">
-                        <button class="btn btn-admin" onclick="handleExportExcel()">📥 Exporter en Excel</button>
-                    </div>
-
-                    <div class="card">
-                        <h2>Tous les Pointages (${state.pointages.length})</h2>
-                        ${state.pointages.length === 0 ? '<p style="color: #999; text-align: center; padding: 40px 0;">Aucun pointage enregistré</p>' : `
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Ouvrier</th>
-                                        <th>Code</th>
-                                        <th>Chantier</th>
-                                        <th>Heures</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${state.pointages.map(p => {
-                                        const ouvrier = OUVRIERS.find(o => o.id === p.ouvrierId);
-                                        const chantier = CHANTIERS.find(c => c.id === p.chantierId);
-                                        return `
-                                            <tr>
-                                                <td>${p.date}</td>
-                                                <td>${ouvrier?.nom}</td>
-                                                <td><strong style="color: #669900;">${chantier?.code}</strong></td>
-                                                <td>${chantier?.nom}</td>
-                                                <td><strong>${p.heures}h</strong></td>
-                                                <td><button class="btn btn-danger" onclick="handleDeletePointage(${p.id})">Supprimer</button></td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        `}
-                    </div>
-
-                    <div class="card">
-                        <h2>Résumé par Ouvrier</h2>
-                        <div class="summary-grid">
-                            ${OUVRIERS.map(o => {
-                                const total = state.pointages.filter(p => p.ouvrierId === o.id).reduce((sum, p) => sum + p.heures, 0);
-                                const count = state.pointages.filter(p => p.ouvrierId === o.id).length;
-                                return `
-                                    <div class="summary-card">
-                                        <div class="summary-name">${o.nom}</div>
-                                        <div class="summary-stat">Pointages: <strong>${count}</strong></div>
-                                        <div class="summary-stat">Total heures: <strong style="color: #9966CC;">${total}h</strong></div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            return html;
-        }
-
-        function attachLoginListeners() {
-            const loginNom = document.getElementById('login-nom');
-            const loginPassword = document.getElementById('login-password');
-            const adminPassword = document.getElementById('admin-password');
-            
-            if (loginNom && loginPassword) {
-                loginNom.onkeypress = (e) => e.key === 'Enter' && handleLoginSubmit();
-                loginPassword.onkeypress = (e) => e.key === 'Enter' && handleLoginSubmit();
-            }
-            
-            if (adminPassword) {
-                adminPassword.onkeypress = (e) => e.key === 'Enter' && handleAdminLoginSubmit();
-            }
-        }
-
-        function attachOuvrierListeners() {
-            // Events are attached inline in HTML
-        }
-
-        function attachAdminListeners() {
-            // Events are attached inline in HTML
-        }
-
-        // ===== INIT =====
-        loadState();
-        render();
-    </script>
+/* ---------- Demarrage ---------- */
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Enter") return;
+  if(document.getElementById("f-nom")){
+    if(e.target.id === "f-admin") connexionAdmin();
+    else if(e.target.id === "f-nom" || e.target.id === "f-mdp") connexion();
+  } else if(e.target && e.target.id && e.target.id.indexOf("hr-") === 0){
+    ajouter(e.target.id.substring(3));
+  }
+});
+charger();
+dessiner();
+</script>
 </body>
 </html>
