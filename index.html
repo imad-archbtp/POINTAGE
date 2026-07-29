@@ -14,15 +14,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .header .sub{font-size:12px;opacity:.9}
 .header-admin{background:linear-gradient(135deg,#9966CC,#a366dd)}
 .btn{padding:10px 16px;border:0;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit}
+.btn:disabled{opacity:.5;cursor:wait}
 .btn-primary{background:#669900;color:#fff}
-.btn-primary:hover{background:#5a8700}
+.btn-primary:hover:enabled{background:#5a8700}
 .btn-admin{background:#9966CC;color:#fff}
-.btn-admin:hover{background:#8855bb}
+.btn-admin:hover:enabled{background:#8855bb}
 .btn-secondary{background:#e6e6e6;color:#333}
-.btn-secondary:hover{background:#d6d6d6}
+.btn-secondary:hover:enabled{background:#d6d6d6}
 .btn-light{background:rgba(255,255,255,.2);color:#fff}
 .btn-danger{background:#fff;color:#c62828;border:1px solid #f0bcbc;padding:6px 10px;font-size:12px}
-.btn-danger:hover{background:#ffecec}
+.btn-danger:hover:enabled{background:#ffecec}
 .login{max-width:420px;margin:40px auto;background:#fff;padding:32px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
 .logo{text-align:center;margin-bottom:24px}
 .logo-text{font-size:34px;font-weight:800;letter-spacing:-1px}
@@ -54,7 +55,6 @@ input:focus,select:focus{outline:0;border-color:#669900}
 .addrow{display:flex;gap:8px;flex-wrap:wrap}
 .addrow select{flex:2;min-width:150px}
 .addrow input{flex:1;min-width:90px}
-.addrow .btn{flex:0 0 auto}
 .wtot{background:#e9f0da;border:2px solid #669900;border-radius:6px;padding:16px;text-align:center;margin-top:6px}
 .wtot .n{font-size:30px;font-weight:800;color:#669900}
 .wtot .l{font-size:13px;color:#555}
@@ -72,35 +72,32 @@ table{width:100%;border-collapse:collapse}
 th{background:#f5f5f5;padding:10px;text-align:left;font-size:13px;border-bottom:2px solid #ddd;white-space:nowrap}
 td{padding:10px;border-bottom:1px solid #eee;font-size:13px}
 tr:hover td{background:#fafafa}
-.warn{background:#fff6e0;border:1px solid #f0d68a;color:#7a5b00;padding:10px 12px;border-radius:6px;font-size:13px;margin-bottom:14px}
-@media(max-width:640px){.day-h{flex-direction:row}.header h1{font-size:19px}}
+.msg{padding:11px 14px;border-radius:6px;font-size:13px;margin-bottom:14px}
+.msg-err{background:#fdecec;border:1px solid #f0bcbc;color:#a32020}
+.msg-info{background:#eef4fb;border:1px solid #bcd4f0;color:#20558a}
+.msg-warn{background:#fff6e0;border:1px solid #f0d68a;color:#7a5b00}
+.chargement{text-align:center;padding:50px 20px;color:#888;font-size:14px}
+@media(max-width:640px){.header h1{font-size:19px}}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div class="chargement">Chargement…</div></div>
 <script>
 "use strict";
 
-/* ====== DONNÉES À PERSONNALISER ====== */
-var OUVRIERS = [
-  {id:1, nom:"Nadeem",      mdp:"1234"},
-  {id:2, nom:"Moujibullah", mdp:"1234"},
-  {id:3, nom:"Rock",        mdp:"1234"},
-  {id:4, nom:"Yaya",        mdp:"1234"},
-  {id:5, nom:"Bogdan",      mdp:"1234"},
-  {id:6, nom:"Yaacoub",     mdp:"1234"},
-  {id:7, nom:"Sardasayed",  mdp:"1234"}
-];
-var MDP_ADMIN = "admin123";
-var CHANTIERS = [
-  {id:1, code:"016", nom:"Paris 15", plans:["Plan_Detail.pdf","Facade.pdf"]},
-  {id:2, code:"011", nom:"Evry",     plans:["Plan_Fondations.pdf","Toiture.pdf"]},
-  {id:3, code:"033", nom:"P10",      plans:["Plan_P10.pdf","Electricite.pdf"]},
-  {id:4, code:"043", nom:"Gonesse",  plans:["Plan_Gonesse.pdf","Cloisons.pdf"]}
-];
-/* ===================================== */
+/* ============================================================
+   >>> COLLEZ ICI L'ADRESSE DE VOTRE APPLICATION GOOGLE APPS SCRIPT
+   Elle ressemble à : https://script.google.com/macros/s/AKfy..../exec
+   ============================================================ */
+var API_URL = "https://script.google.com/macros/s/AKfycbwTA4ndRHBniI7kkQtYzfYbIb03ipaBEyh-qlzORKdtV7l8Gjo4u429rcf8lPKZI6ES/exec";
+/* ============================================================ */
 
-var state = {user:null, admin:false, pointages:[], lundi:lundiDe(new Date()), stockageOk:true};
+var state = {
+  nom: null, mdp: null, admin: false,
+  chantiers: [], pointages: [], ouvriers: [],
+  lundi: lundiDe(new Date()),
+  occupe: false, message: null, typeMessage: "err"
+};
 var JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 
 /* ---------- Dates ---------- */
@@ -110,188 +107,222 @@ function lundiDe(d){
   x.setDate(x.getDate() - (j === 0 ? 6 : j - 1));
   return x;
 }
-function cle(d){ // AAAA-MM-JJ : cle de tri fiable
+function cle(d){
   var m = d.getMonth()+1, j = d.getDate();
   return d.getFullYear()+"-"+(m<10?"0":"")+m+"-"+(j<10?"0":"")+j;
 }
-function affiche(k){ var p = k.split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
+function affiche(k){ var p = String(k).split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
 function jourPlus(d,n){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
-function semaine(lundi){ var t=[]; for(var i=0;i<6;i++) t.push(jourPlus(lundi,i)); return t; }
-
-/* ---------- Stockage ---------- */
-function charger(){
-  try{
-    var s = window.localStorage.getItem("sp2e_pointages");
-    if(s) state.pointages = JSON.parse(s);
-  }catch(e){ state.stockageOk = false; }
-}
-function sauver(){
-  try{ window.localStorage.setItem("sp2e_pointages", JSON.stringify(state.pointages)); }
-  catch(e){ state.stockageOk = false; }
-}
-
-/* ---------- Utilitaires ---------- */
-function ouvrier(id){ for(var i=0;i<OUVRIERS.length;i++) if(OUVRIERS[i].id===id) return OUVRIERS[i]; return null; }
-function chantier(id){ for(var i=0;i<CHANTIERS.length;i++) if(CHANTIERS[i].id===id) return CHANTIERS[i]; return null; }
+function semaine(l){ var t=[]; for(var i=0;i<6;i++) t.push(jourPlus(l,i)); return t; }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function arrondi(n){ return Math.round(n*100)/100; }
+
+/* ---------- Session (survit au rafraîchissement) ---------- */
+function memoriser(){
+  try{
+    if(state.nom) sessionStorage.setItem("sp2e_session", JSON.stringify({nom:state.nom, mdp:state.mdp}));
+    else if(state.admin) sessionStorage.setItem("sp2e_session", JSON.stringify({admin:true, mdp:state.mdp}));
+    else sessionStorage.removeItem("sp2e_session");
+  }catch(e){}
+}
+function reprendre(){
+  try{
+    var s = sessionStorage.getItem("sp2e_session");
+    return s ? JSON.parse(s) : null;
+  }catch(e){ return null; }
+}
+
+/* ---------- Appel serveur ---------- */
+function appeler(donnees){
+  if(API_URL.indexOf("script.google.com") === -1){
+    return Promise.reject(new Error("L'adresse du serveur n'est pas encore renseignée dans le fichier (variable API_URL)."));
+  }
+  return fetch(API_URL, { method:"POST", body: JSON.stringify(donnees) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j.ok) throw new Error(j.erreur || "Erreur du serveur.");
+      return j;
+    });
+}
+function erreur(e){
+  var m = e && e.message ? e.message : String(e);
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)){
+    m = "Connexion impossible. Vérifiez votre réseau, puis réessayez.";
+  }
+  state.message = m; state.typeMessage = "err";
+  state.occupe = false; dessiner();
+}
 
 /* ---------- Actions ---------- */
 function connexion(){
   var nom = (document.getElementById("f-nom").value||"").trim();
   var mdp = (document.getElementById("f-mdp").value||"").trim();
-  if(!nom || !mdp){ alert("Merci de saisir votre nom et votre mot de passe."); return; }
-  var o = null;
-  for(var i=0;i<OUVRIERS.length;i++){
-    if(OUVRIERS[i].nom.toLowerCase() === nom.toLowerCase()) o = OUVRIERS[i];
-  }
-  if(!o || o.mdp !== mdp){ alert("Nom ou mot de passe incorrect."); return; }
-  state.user = o; state.admin = false; state.lundi = lundiDe(new Date());
-  dessiner();
+  if(!nom || !mdp){ state.message="Saisissez votre nom et votre mot de passe."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"login", nom:nom, mdp:mdp}).then(function(j){
+    state.nom = j.nom; state.mdp = mdp; state.admin = false;
+    state.chantiers = j.chantiers; state.lundi = lundiDe(new Date());
+    memoriser();
+    return chargerMes();
+  }).catch(erreur);
 }
 function connexionAdmin(){
   var mdp = (document.getElementById("f-admin").value||"").trim();
-  if(mdp !== MDP_ADMIN){ alert("Mot de passe administrateur incorrect."); return; }
-  state.admin = true; state.user = null;
-  dessiner();
+  if(!mdp){ state.message="Saisissez le mot de passe."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"loginAdmin", mdp:mdp}).then(function(j){
+    state.admin = true; state.nom = null; state.mdp = mdp;
+    state.chantiers = j.chantiers;
+    memoriser();
+    return chargerTous();
+  }).catch(erreur);
 }
-function deconnexion(){ state.user = null; state.admin = false; dessiner(); }
+function chargerMes(){
+  state.occupe = true; dessiner();
+  return appeler({action:"mes", nom:state.nom, mdp:state.mdp}).then(function(j){
+    state.pointages = j.pointages; state.occupe = false; dessiner();
+  }).catch(erreur);
+}
+function chargerTous(){
+  state.occupe = true; dessiner();
+  return appeler({action:"tous", mdpAdmin:state.mdp}).then(function(j){
+    state.pointages = j.pointages; state.ouvriers = j.ouvriers;
+    state.occupe = false; dessiner();
+  }).catch(erreur);
+}
+function deconnexion(){
+  state.nom=null; state.mdp=null; state.admin=false;
+  state.pointages=[]; state.message=null;
+  memoriser(); dessiner();
+}
 function semPrec(){ state.lundi = jourPlus(state.lundi,-7); dessiner(); }
 function semSuiv(){ state.lundi = jourPlus(state.lundi,7); dessiner(); }
 function semAuj(){ state.lundi = lundiDe(new Date()); dessiner(); }
 
-function ajouter(dateCle){
-  var sel = document.getElementById("ch-"+dateCle);
-  var inp = document.getElementById("hr-"+dateCle);
-  var cid = parseInt(sel.value,10);
+function ajouter(k){
+  var sel = document.getElementById("ch-"+k), inp = document.getElementById("hr-"+k);
+  var code = sel.value;
   var h = parseFloat(String(inp.value).replace(",","."));
-  if(!cid){ alert("Choisissez un chantier."); sel.focus(); return; }
-  if(!(h > 0)){ alert("Saisissez un nombre d'heures (ex : 8 ou 7.5)."); inp.focus(); return; }
-  if(h > 24){ alert("Maximum 24 heures par ligne."); inp.focus(); return; }
-  state.pointages.push({id:Date.now()+Math.floor(Math.random()*1000), ouvrierId:state.user.id, chantierId:cid, heures:arrondi(h), date:dateCle});
-  sauver(); dessiner();
+  if(!code){ state.message="Choisissez un chantier."; state.typeMessage="err"; dessiner(); return; }
+  if(!(h>0) || h>24){ state.message="Saisissez un nombre d'heures valide (ex : 8 ou 7.5)."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h})
+    .then(chargerMes).catch(erreur);
 }
 function supprimer(id){
   if(!confirm("Supprimer cette ligne ?")) return;
-  var t=[]; for(var i=0;i<state.pointages.length;i++) if(state.pointages[i].id!==id) t.push(state.pointages[i]);
-  state.pointages = t; sauver(); dessiner();
+  state.occupe = true; state.message = null; dessiner();
+  var d = state.admin
+    ? {action:"supprimer", id:id, mdpAdmin:state.mdp}
+    : {action:"supprimer", id:id, nom:state.nom, mdp:state.mdp};
+  appeler(d).then(state.admin ? chargerTous : chargerMes).catch(erreur);
 }
 
-/* ---------- Export Excel (sans librairie externe) ---------- */
+/* ---------- Export Excel (aucune librairie externe) ---------- */
 function exportExcel(){
-  if(state.pointages.length === 0){ alert("Aucun pointage à exporter."); return; }
-  var lignes = state.pointages.slice().sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-  var h = '<table border="1"><tr>'
-        + '<th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th></tr>';
-  var total = 0;
-  for(var i=0;i<lignes.length;i++){
-    var p = lignes[i], o = ouvrier(p.ouvrierId), c = chantier(p.chantierId);
-    total += p.heures;
-    h += '<tr><td>'+affiche(p.date)+'</td><td>'+esc(o?o.nom:"")+'</td><td>'+esc(c?c.code:"")
-       + '</td><td>'+esc(c?c.nom:"")+'</td><td>'+p.heures+'</td></tr>';
+  if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
+  var l = state.pointages.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th></tr>';
+  var tot = 0;
+  for(var i=0;i<l.length;i++){
+    tot += l[i].heures;
+    t += '<tr><td>'+affiche(l[i].date)+'</td><td>'+esc(l[i].ouvrier)+'</td><td>'+esc(l[i].code)
+      +  '</td><td>'+esc(l[i].chantier)+'</td><td>'+l[i].heures+'</td></tr>';
   }
-  h += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(total)+'</b></td></tr></table>';
-
+  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td></tr></table>';
   var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
-          + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
-          + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
-          + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
-          + '</head><body>'+h+'</body></html>';
-
-  var blob = new Blob(["\ufeff"+doc], {type:"application/vnd.ms-excel;charset=utf-8"});
-  var d = new Date();
-  var nom = "Pointages_"+cle(d)+".xls";
-  var url = URL.createObjectURL(blob);
+    + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+    + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>'+t+'</body></html>';
+  var url = URL.createObjectURL(new Blob(["\ufeff"+doc],{type:"application/vnd.ms-excel;charset=utf-8"}));
   var a = document.createElement("a");
-  a.href = url; a.download = nom;
+  a.href = url; a.download = "Pointages_"+cle(new Date())+".xls";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
 }
 
 /* ---------- Rendu ---------- */
+function bandeau(){
+  if(!state.message) return "";
+  return '<div class="msg msg-'+state.typeMessage+'">'+esc(state.message)+'</div>';
+}
 function dessiner(){
   var app = document.getElementById("app");
   if(state.admin) app.innerHTML = vueAdmin();
-  else if(state.user) app.innerHTML = vueOuvrier();
-  else { app.innerHTML = vueLogin(); var n = document.getElementById("f-nom"); if(n) n.focus(); }
+  else if(state.nom) app.innerHTML = vueOuvrier();
+  else { app.innerHTML = vueLogin(); var n=document.getElementById("f-nom"); if(n && !state.occupe) n.focus(); }
 }
 
 function vueLogin(){
+  var d = state.occupe ? " disabled" : "";
+  var avert = API_URL.indexOf("script.google.com") === -1
+    ? '<div class="msg msg-warn">L\'adresse du serveur n\'est pas encore renseignée dans le fichier (variable API_URL, tout en haut du script).</div>' : '';
   return ''
   + '<div class="login">'
   +   '<div class="logo"><div class="logo-text"><span class="logo-a">SP</span><span class="logo-b">2E</span></div>'
   +     '<div class="sub">Société Parisienne d\'Équipement Électrique</div></div>'
+  +   avert + bandeau()
   +   '<h2>Connexion ouvrier</h2>'
-  +   '<div class="fg"><label>Nom</label><input type="text" id="f-nom" autocomplete="username" placeholder="Ex : Nadeem"></div>'
-  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-mdp" autocomplete="current-password" placeholder="****"></div>'
-  +   '<button type="button" class="btn btn-primary" style="width:100%" onclick="connexion()">Se connecter</button>'
-  +   '<div class="hint">Mot de passe par défaut : 1234</div>'
+  +   '<div class="fg"><label>Nom</label><input type="text" id="f-nom" autocomplete="username" placeholder="Ex : Nadeem"'+d+'></div>'
+  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-mdp" autocomplete="current-password" placeholder="****"'+d+'></div>'
+  +   '<button type="button" class="btn btn-primary" style="width:100%" onclick="connexion()"'+d+'>'+(state.occupe?"Connexion…":"Se connecter")+'</button>'
   +   '<div class="divider"></div>'
   +   '<h2>Accès administrateur</h2>'
-  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-admin" placeholder="****"></div>'
-  +   '<button type="button" class="btn btn-admin" style="width:100%" onclick="connexionAdmin()">Entrer</button>'
+  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-admin" placeholder="****"'+d+'></div>'
+  +   '<button type="button" class="btn btn-admin" style="width:100%" onclick="connexionAdmin()"'+d+'>Entrer</button>'
   + '</div>';
 }
 
 function vueOuvrier(){
   var jours = semaine(state.lundi);
+  var dis = state.occupe ? " disabled" : "";
   var h = ''
   + '<div class="header"><div class="header-in">'
-  +   '<div><h1>Pointage chantier</h1><div class="sub">SP2E &middot; '+esc(state.user.nom)+'</div></div>'
+  +   '<div><h1>Pointage chantier</h1><div class="sub">SP2E &middot; '+esc(state.nom)+'</div></div>'
   +   '<button type="button" class="btn btn-light" onclick="deconnexion()">Déconnexion</button>'
-  + '</div></div><div class="container">';
+  + '</div></div><div class="container">'
+  + bandeau()
+  + (state.occupe ? '<div class="msg msg-info">Synchronisation en cours…</div>' : '')
+  + '<div class="card">'
+  +   '<div class="weeknav">'
+  +     '<button type="button" class="btn btn-secondary" onclick="semPrec()">&larr; Semaine précédente</button>'
+  +     '<div class="title">Semaine du '+affiche(cle(jours[0]))+' au '+affiche(cle(jours[5]))+'</div>'
+  +     '<button type="button" class="btn btn-secondary" onclick="semSuiv()">Semaine suivante &rarr;</button>'
+  +   '</div>'
+  +   '<div style="text-align:center;margin-bottom:16px"><button type="button" class="btn btn-secondary" onclick="semAuj()">Revenir à cette semaine</button></div>';
 
-  if(!state.stockageOk) h += '<div class="warn">Attention : la sauvegarde locale est bloquée par le navigateur. Les heures saisies seront perdues en fermant la page.</div>';
-
-  h += '<div class="card">'
-    +   '<div class="weeknav">'
-    +     '<button type="button" class="btn btn-secondary" onclick="semPrec()">&larr; Semaine précédente</button>'
-    +     '<div class="title">Semaine du '+affiche(cle(jours[0]))+' au '+affiche(cle(jours[5]))+'</div>'
-    +     '<button type="button" class="btn btn-secondary" onclick="semSuiv()">Semaine suivante &rarr;</button>'
-    +   '</div>'
-    +   '<div style="text-align:center;margin-bottom:16px"><button type="button" class="btn btn-secondary" onclick="semAuj()">Revenir à cette semaine</button></div>';
-
-  var totalSem = 0;
+  var totSem = 0;
   for(var i=0;i<jours.length;i++){
-    var k = cle(jours[i]);
-    var duJour = [];
-    var totJour = 0;
+    var k = cle(jours[i]), duJour = [], totJour = 0;
     for(var j=0;j<state.pointages.length;j++){
-      var p = state.pointages[j];
-      if(p.ouvrierId === state.user.id && p.date === k){ duJour.push(p); totJour += p.heures; }
+      if(state.pointages[j].date === k){ duJour.push(state.pointages[j]); totJour += state.pointages[j].heures; }
     }
-    totalSem += totJour;
-
-    h += '<div class="day">'
-      +   '<div class="day-h"><div><div class="day-name">'+JOURS[i]+'</div><div class="day-date">'+affiche(k)+'</div></div>'
-      +   '<div class="day-tot"><small>Total du jour</small>'+arrondi(totJour)+' h</div></div>';
-
+    totSem += totJour;
+    h += '<div class="day"><div class="day-h">'
+      +  '<div><div class="day-name">'+JOURS[i]+'</div><div class="day-date">'+affiche(k)+'</div></div>'
+      +  '<div class="day-tot"><small>Total du jour</small>'+arrondi(totJour)+' h</div></div>';
     if(duJour.length === 0) h += '<div class="empty">Aucune heure saisie.</div>';
     for(var m=0;m<duJour.length;m++){
-      var pp = duJour[m], cc = chantier(pp.chantierId);
-      h += '<div class="line"><div class="info"><div class="code">'+esc(cc?cc.code:"?")+'</div>'
-        +  '<div class="nom">'+esc(cc?cc.nom:"Chantier inconnu")+'</div></div>'
-        +  '<div class="h">'+pp.heures+' h</div>'
-        +  '<button type="button" class="btn btn-danger" onclick="supprimer('+pp.id+')">Supprimer</button></div>';
+      h += '<div class="line"><div class="info"><div class="code">'+esc(duJour[m].code)+'</div>'
+        +  '<div class="nom">'+esc(duJour[m].chantier)+'</div></div>'
+        +  '<div class="h">'+duJour[m].heures+' h</div>'
+        +  '<button type="button" class="btn btn-danger" onclick="supprimer(\''+esc(duJour[m].id)+'\')"'+dis+'>Supprimer</button></div>';
     }
-
-    h += '<div class="addrow">'
-      +    '<select id="ch-'+k+'"><option value="">Choisir un chantier</option>';
-    for(var n=0;n<CHANTIERS.length;n++) h += '<option value="'+CHANTIERS[n].id+'">'+esc(CHANTIERS[n].code+" - "+CHANTIERS[n].nom)+'</option>';
-    h +=     '</select>'
-      +    '<input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures">'
-      +    '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')">Ajouter</button>'
-      +  '</div></div>';
+    h += '<div class="addrow"><select id="ch-'+k+'"'+dis+'><option value="">Choisir un chantier</option>';
+    for(var n=0;n<state.chantiers.length;n++){
+      h += '<option value="'+esc(state.chantiers[n].code)+'">'+esc(state.chantiers[n].code+" - "+state.chantiers[n].nom)+'</option>';
+    }
+    h += '</select><input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures"'+dis+'>'
+      +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div></div>';
   }
 
-  h += '<div class="wtot"><div class="l">Total de la semaine</div><div class="n">'+arrondi(totalSem)+' h</div></div>'
-    +  '</div>';
+  h += '<div class="wtot"><div class="l">Total de la semaine</div><div class="n">'+arrondi(totSem)+' h</div></div></div>';
 
   h += '<div class="card"><h2>Plans des chantiers</h2><div class="grid">';
-  for(var q=0;q<CHANTIERS.length;q++){
-    var c2 = CHANTIERS[q];
-    h += '<div class="plan"><div class="code">'+esc(c2.code)+'</div><div class="nom">'+esc(c2.nom)+'</div><div class="l">';
-    for(var r=0;r<c2.plans.length;r++) h += esc(c2.plans[r]) + (r<c2.plans.length-1 ? '<br>' : '');
+  for(var q=0;q<state.chantiers.length;q++){
+    var c = state.chantiers[q];
+    h += '<div class="plan"><div class="code">'+esc(c.code)+'</div><div class="nom">'+esc(c.nom)+'</div><div class="l">';
+    for(var r=0;r<c.plans.length;r++) h += esc(c.plans[r]) + (r<c.plans.length-1 ? '<br>' : '');
     h += '</div></div>';
   }
   h += '</div></div></div>';
@@ -299,35 +330,40 @@ function vueOuvrier(){
 }
 
 function vueAdmin(){
-  var lignes = state.pointages.slice().sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  var l = state.pointages.slice().sort(function(a,b){ return a.date<b.date?1:a.date>b.date?-1:0; });
+  var dis = state.occupe ? " disabled" : "";
   var h = ''
   + '<div class="header header-admin"><div class="header-in">'
   +   '<div><h1>Administration</h1><div class="sub">SP2E &middot; gestion des pointages</div></div>'
   +   '<button type="button" class="btn btn-light" onclick="deconnexion()">Déconnexion</button>'
   + '</div></div><div class="container">'
-  + '<div class="card"><button type="button" class="btn btn-admin" onclick="exportExcel()">Exporter vers Excel</button></div>'
-  + '<div class="card"><h2>Tous les pointages ('+lignes.length+')</h2>';
+  + bandeau()
+  + (state.occupe ? '<div class="msg msg-info">Synchronisation en cours…</div>' : '')
+  + '<div class="card">'
+  +   '<button type="button" class="btn btn-admin" onclick="exportExcel()"'+dis+'>Exporter vers Excel</button> '
+  +   '<button type="button" class="btn btn-secondary" onclick="chargerTous()"'+dis+'>Actualiser</button>'
+  + '</div>'
+  + '<div class="card"><h2>Tous les pointages ('+l.length+')</h2>';
 
-  if(lignes.length === 0){
+  if(l.length === 0){
     h += '<div class="empty">Aucun pointage enregistré.</div>';
   } else {
     h += '<div class="tw"><table><thead><tr><th>Date</th><th>Ouvrier</th><th>Code</th><th>Chantier</th><th>Heures</th><th></th></tr></thead><tbody>';
-    for(var i=0;i<lignes.length;i++){
-      var p = lignes[i], o = ouvrier(p.ouvrierId), c = chantier(p.chantierId);
-      h += '<tr><td>'+affiche(p.date)+'</td><td><b>'+esc(o?o.nom:"?")+'</b></td>'
-        +  '<td style="color:#669900;font-weight:700">'+esc(c?c.code:"?")+'</td><td>'+esc(c?c.nom:"?")+'</td>'
-        +  '<td><b>'+p.heures+' h</b></td>'
-        +  '<td><button type="button" class="btn btn-danger" onclick="supprimer('+p.id+')">Supprimer</button></td></tr>';
+    for(var i=0;i<l.length;i++){
+      h += '<tr><td>'+affiche(l[i].date)+'</td><td><b>'+esc(l[i].ouvrier)+'</b></td>'
+        +  '<td style="color:#669900;font-weight:700">'+esc(l[i].code)+'</td><td>'+esc(l[i].chantier)+'</td>'
+        +  '<td><b>'+l[i].heures+' h</b></td>'
+        +  '<td><button type="button" class="btn btn-danger" onclick="supprimer(\''+esc(l[i].id)+'\')"'+dis+'>Supprimer</button></td></tr>';
     }
     h += '</tbody></table></div>';
   }
   h += '</div><div class="card"><h2>Récapitulatif par ouvrier</h2><div class="grid">';
-  for(var k=0;k<OUVRIERS.length;k++){
-    var tot = 0, nb = 0;
+  for(var k=0;k<state.ouvriers.length;k++){
+    var tot=0, nb=0;
     for(var j=0;j<state.pointages.length;j++){
-      if(state.pointages[j].ouvrierId === OUVRIERS[k].id){ tot += state.pointages[j].heures; nb++; }
+      if(state.pointages[j].ouvrier === state.ouvriers[k]){ tot += state.pointages[j].heures; nb++; }
     }
-    h += '<div class="sum"><div class="n">'+esc(OUVRIERS[k].nom)+'</div>'
+    h += '<div class="sum"><div class="n">'+esc(state.ouvriers[k])+'</div>'
       +  '<div class="s">Lignes saisies : <b>'+nb+'</b></div>'
       +  '<div class="s">Total : <b>'+arrondi(tot)+' h</b></div></div>';
   }
@@ -335,18 +371,31 @@ function vueAdmin(){
   return h;
 }
 
-/* ---------- Demarrage ---------- */
+/* ---------- Démarrage ---------- */
 document.addEventListener("keydown", function(e){
-  if(e.key !== "Enter") return;
-  if(document.getElementById("f-nom")){
-    if(e.target.id === "f-admin") connexionAdmin();
-    else if(e.target.id === "f-nom" || e.target.id === "f-mdp") connexion();
-  } else if(e.target && e.target.id && e.target.id.indexOf("hr-") === 0){
-    ajouter(e.target.id.substring(3));
-  }
+  if(e.key !== "Enter" || state.occupe) return;
+  var id = e.target && e.target.id;
+  if(id === "f-admin") connexionAdmin();
+  else if(id === "f-nom" || id === "f-mdp") connexion();
+  else if(id && id.indexOf("hr-") === 0) ajouter(id.substring(3));
 });
-charger();
-dessiner();
+
+(function(){
+  var s = reprendre();
+  if(s && s.admin){
+    state.admin = true; state.mdp = s.mdp;
+    appeler({action:"loginAdmin", mdp:s.mdp}).then(function(j){
+      state.chantiers = j.chantiers; return chargerTous();
+    }).catch(function(){ deconnexion(); });
+  } else if(s && s.nom){
+    state.nom = s.nom; state.mdp = s.mdp;
+    appeler({action:"login", nom:s.nom, mdp:s.mdp}).then(function(j){
+      state.chantiers = j.chantiers; return chargerMes();
+    }).catch(function(){ deconnexion(); });
+  } else {
+    dessiner();
+  }
+})();
 </script>
 </body>
 </html>
