@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pointage Chantier - S2E</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --color-green: #669900;
+            --color-purple: #9966CC;
+            --color-light-green: #f0f4e8;
+            --color-light-purple: #f5f1fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #669900 0%, #7aa817 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #669900;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a8700;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 153, 0, 0.3);
+        }
+
+        .btn-admin {
+            background: #9966CC;
+            color: white;
+        }
+
+        .btn-admin:hover {
+            background: #8855bb;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-danger {
+            background: #ff4444;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background: #cc0000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Login Screen */
+        .login-container {
+            max-width: 450px;
+            margin: 100px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-text {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+        }
+
+        .logo-s { color: #669900; }
+        .logo-e { color: #9966CC; }
+
+        .login-subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #669900;
+            margin-bottom: 30px;
+        }
+
+        .login-section {
+            margin-bottom: 30px;
+        }
+
+        .login-section h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #669900;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 30px 0;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .divider::before {
+            content: '';
+            display: block;
+            height: 1px;
+            background: #ddd;
+            margin-bottom: 10px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        /* Main App */
+        .header-admin {
+            background: linear-gradient(135deg, #9966CC 0%, #a366dd 100%);
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #669900;
+            padding-bottom: 10px;
+        }
+
+        .week-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+
+        .week-title {
+            text-align: center;
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+
+        .day-card {
+            background: #f0f4e8;
+            border-left: 4px solid #669900;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .day-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .day-date {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .day-total {
+            text-align: right;
+        }
+
+        .day-total-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .day-total-hours {
+            font-size: 28px;
+            font-weight: bold;
+            color: #669900;
+        }
+
+        .pointage-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #669900;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pointage-info {
+            flex: 1;
+        }
+
+        .pointage-code {
+            font-weight: bold;
+            color: #669900;
+            font-size: 12px;
+        }
+
+        .pointage-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .pointage-hours {
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+            margin-right: 15px;
+        }
+
+        .add-pointage-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .add-pointage-row select {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .week-total {
+            background: linear-gradient(135deg, #f0f4e8 0%, #e8f0d8 100%);
+            border: 2px solid #669900;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .week-total-label {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .week-total-hours {
+            font-size: 32px;
+            font-weight: bold;
+            color: #669900;
+        }
+
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .plan-card {
+            background: #f0f4e8;
+            border: 2px solid #669900;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .plan-code {
+            font-weight: bold;
+            color: #669900;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .plan-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .plan-list {
+            font-size: 12px;
+            color: #669900;
+            line-height: 1.6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        table th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+            font-size: 13px;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .summary-card {
+            background: #f5f1fa;
+            border: 2px solid #9966CC;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .summary-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .summary-stat {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .summary-stat strong {
+            color: #9966CC;
+        }
+
+        @media (max-width: 768px) {
+            .week-navigation {
+                flex-direction: column;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .day-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .plans-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // ===== STATE =====
+        const state = {
+            currentUser: null,
+            isAdmin: false,
+            pointages: [],
+            currentWeek: getMonday(new Date())
+        };
+
+        const OUVRIERS = [
+            { id: 1, nom: 'Nadeem', password: '1234' },
+            { id: 2, nom: 'Moujibullah', password: '1234' },
+            { id: 3, nom: 'Rock', password: '1234' },
+            { id: 4, nom: 'Yaya', password: '1234' },
+            { id: 5, nom: 'Bogdan', password: '1234' },
+            { id: 6, nom: 'Yaacoub', password: '1234' },
+            { id: 7, nom: 'Sardasayed', password: '1234' }
+        ];
+
+        const CHANTIERS = [
+            { id: 1, code: '016', nom: 'Paris 15', plans: ['Plan_Détail.pdf', 'Façade.pdf'] },
+            { id: 2, code: '011', nom: 'Evry', plans: ['Plan_Fondations.pdf', 'Toiture.pdf'] },
+            { id: 3, code: '033', nom: 'P10', plans: ['Plan_P10.pdf', 'Électricité.pdf'] },
+            { id: 4, code: '043', nom: 'Gonesse', plans: ['Plan_Gonesse.pdf', 'Cloisons.pdf'] }
+        ];
+
+        // ===== UTILITIES =====
+        function getMonday(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function getDaysOfWeek(monday) {
+            const days = [];
+            for (let i = 0; i < 6; i++) {
+                const date = new Date(monday);
+                date.setDate(date.getDate() + i);
+                days.push(date);
+            }
+            return days;
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('pointages_app');
+            if (saved) {
+                state.pointages = JSON.parse(saved);
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem('pointages_app', JSON.stringify(state.pointages));
+        }
+
+        // ===== EVENT HANDLERS =====
+        function handleLoginSubmit() {
+            const nom = document.getElementById('login-nom')?.value.trim();
+            const password = document.getElementById('login-password')?.value.trim();
+            
+            if (!nom || !password) {
+                alert('Veuillez remplir tous les champs');
+                return;
+            }
+
+            const ouvrier = OUVRIERS.find(o => o.nom.toLowerCase() === nom.toLowerCase());
+            if (ouvrier && ouvrier.password === password) {
+                state.currentUser = ouvrier;
+                state.isAdmin = false;
+                render();
+            } else {
+                alert('Nom ou mot de passe incorrect');
+            }
+        }
+
+        function handleAdminLoginSubmit() {
+            const password = document.getElementById('admin-password')?.value.trim();
+            if (password === 'admin123') {
+                state.isAdmin = true;
+                state.currentUser = null;
+                render();
+            } else {
+                alert('Mot de passe incorrect');
+            }
+        }
+
+        function handleLogout() {
+            state.currentUser = null;
+            state.isAdmin = false;
+            render();
+        }
+
+        function handlePrevWeek() {
+            state.currentWeek = new Date(state.currentWeek.getTime() - 7*24*60*60*1000);
+            render();
+        }
+
+        function handleNextWeek() {
+            state.currentWeek = new Date(state.currentWeek.getTime() + 7*24*60*60*1000);
+            render();
+        }
+
+        function handleAddPointage(date, chantierId) {
+            const heures = prompt('Nombre d\'heures:');
+            if (heures && !isNaN(heures)) {
+                state.pointages.push({
+                    id: Date.now(),
+                    ouvrierId: state.currentUser.id,
+                    chantierId: parseInt(chantierId),
+                    heures: parseFloat(heures),
+                    date: date.toLocaleDateString('fr-FR')
+                });
+                saveState();
+                render();
+            }
+        }
+
+        function handleDeletePointage(id) {
+            if (confirm('Supprimer ce pointage ?')) {
+                state.pointages = state.pointages.filter(p => p.id !== id);
+                saveState();
+                render();
+            }
+        }
+
+        function handleExportExcel() {
+            const data = state.pointages.map(p => ({
+                Date: p.date,
+                'Nom Ouvrier': OUVRIERS.find(o => o.id === p.ouvrierId)?.nom || '',
+                'Code Affaire': CHANTIERS.find(c => c.id === p.chantierId)?.code || '',
+                'Chantier': CHANTIERS.find(c => c.id === p.chantierId)?.nom || '',
+                'Heures': p.heures
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 8 }];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
+            XLSX.writeFile(wb, `Pointages_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.xlsx`);
+        }
+
+        // ===== RENDER =====
+        function render() {
+            const app = document.getElementById('app');
+
+            if (!state.currentUser && !state.isAdmin) {
+                app.innerHTML = renderLogin();
+                attachLoginListeners();
+            } else if (state.currentUser) {
+                app.innerHTML = renderOuvrier();
+                attachOuvrierListeners();
+            } else if (state.isAdmin) {
+                app.innerHTML = renderAdmin();
+                attachAdminListeners();
+            }
+        }
+
+        function renderLogin() {
+            return `
+                <div class="login-container">
+                    <div class="login-logo">
+                        <div class="logo-text"><span class="logo-s">SP</span><span class="logo-e">2E</span></div>
+                        <div class="login-subtitle">Société Parisienne d'Équipement Électrique</div>
+                    </div>
+                    <h1 class="login-title">Pointage Chantier</h1>
+
+                    <div class="login-section">
+                        <h2>Connexion Ouvrier</h2>
+                        <div class="form-group">
+                            <label>Votre nom</label>
+                            <input type="text" id="login-nom" placeholder="Ex: Nadeem">
+                        </div>
+                        <div class="form-group">
+                            <label>Mot de passe</label>
+                            <input type="password" id="login-password" placeholder="****">
+                        </div>
+                        <button class="btn btn-primary" style="width:100%;">Se connecter</button>
+                        <div class="hint">Mot de passe par défaut: 1234</div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="login-section">
+                        <h2>🔐 Admin</h2>
+                        <div class="form-group">
+                            <label>Mot de passe admin</label>
+                            <input type="password" id="admin-password" placeholder="****">
+                        </div>
+                        <button class="btn btn-admin" style="width:100%;">Accès Admin</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderOuvrier() {
+            const daysOfWeek = getDaysOfWeek(state.currentWeek);
+            const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
+            let html = `
+                <div class="header">
+                    <div class="header-content">
+                        <h1>Pointage Chantier</h1>
+                        <div class="header-right">
+                            <span>${state.currentUser.nom}</span>
+                            <button class="btn btn-secondary" onclick="handleLogout()">Déconnexion</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="container">
+                    <div class="card">
+                        <div class="week-navigation">
+                            <button class="btn btn-secondary" onclick="handlePrevWeek()">← Semaine précédente</button>
+                            <div class="week-title">
+                                Semaine du ${daysOfWeek[0].toLocaleDateString('fr-FR')} au ${daysOfWeek[5].toLocaleDateString('fr-FR')}
+                            </div>
+                            <button class="btn btn-secondary" onclick="handleNextWeek()">Semaine suivante →</button>
+                        </div>
+            `;
+
+            daysOfWeek.forEach((date, dayIndex) => {
+                const dayPointages = state.pointages.filter(p =>
+                    p.ouvrierId === state.currentUser.id &&
+                    p.date === date.toLocaleDateString('fr-FR')
+                );
+                const dayTotal = dayPointages.reduce((sum, p) => sum + p.heures, 0);
+
+                html += `
+                    <div class="day-card">
+                        <div class="day-header">
+                            <div>
+                                <div class="day-name">${dayNames[dayIndex]}</div>
+                                <div class="day-date">${date.toLocaleDateString('fr-FR')}</div>
+                            </div>
+                            <div class="day-total">
+                                <div class="day-total-label">Total du jour</div>
+                                <div class="day-total-hours">${dayTotal}h</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            ${dayPointages.length === 0 ? '<p style="color: #999; font-size: 13px;">Aucun pointage</p>' : ''}
+                            ${dayPointages.map(p => {
+                                const chantier = CHANTIERS.find(c => c.id === p.chantierId);
+                                return `
+                                    <div class="pointage-item">
+                                        <div class="pointage-info">
+                                            <div class="pointage-code">${chantier?.code}</div>
+                                            <div class="pointage-name">${chantier?.nom}</div>
+                                        </div>
+                                        <div class="pointage-hours">${p.heures}h</div>
+                                        <button class="btn btn-danger" onclick="handleDeletePointage(${p.id})">Supprimer</button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <div class="add-pointage-row">
+                            <select onchange="if(this.value) handleAddPointage(new Date('${date.toISOString()}'), this.value); this.value='';">
+                                <option value="">+ Ajouter un chantier</option>
+                                ${CHANTIERS.map(c => `<option value="${c.id}">${c.code} - ${c.nom}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const weekTotal = state.pointages.filter(p => {
+                const pDate = new Date(p.date.split('/').reverse().join('-'));
+                return p.ouvrierId === state.currentUser.id && pDate >= state.currentWeek && pDate < new Date(state.currentWeek.getTime() + 7*24*60*60*1000);
+            }).reduce((sum, p) => sum + p.heures, 0);
+
+            html += `
+                        <div class="week-total">
+                            <div class="week-total-label">Total semaine</div>
+                            <div class="week-total-hours">${weekTotal}h</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Plans Chantier</h2>
+                        <div class="plans-grid">
+                            ${CHANTIERS.map(c => `
+                                <div class="plan-card">
+                                    <div class="plan-code">${c.code}</div>
+                                    <div class="plan-name">${c.nom}</div>
+                                    <div class="plan-list">
+                                        ${c.plans.map(p => `📄 ${p}`).join('<br>')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function renderAdmin() {
+            let html = `
+                <div class="header header-admin">
+                    <div class="header-content">
+                        <h1>Admin - Gestion Pointages</h1>
+                        <button class="btn btn-secondary" onclick="handleLogout()">Déconnexion</button>
+                    </div>
+                </div>
+
+                <div class="container">
+                    <div class="card">
+                        <button class="btn btn-admin" onclick="handleExportExcel()">📥 Exporter en Excel</button>
+                    </div>
+
+                    <div class="card">
+                        <h2>Tous les Pointages (${state.pointages.length})</h2>
+                        ${state.pointages.length === 0 ? '<p style="color: #999; text-align: center; padding: 40px 0;">Aucun pointage enregistré</p>' : `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Ouvrier</th>
+                                        <th>Code</th>
+                                        <th>Chantier</th>
+                                        <th>Heures</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${state.pointages.map(p => {
+                                        const ouvrier = OUVRIERS.find(o => o.id === p.ouvrierId);
+                                        const chantier = CHANTIERS.find(c => c.id === p.chantierId);
+                                        return `
+                                            <tr>
+                                                <td>${p.date}</td>
+                                                <td>${ouvrier?.nom}</td>
+                                                <td><strong style="color: #669900;">${chantier?.code}</strong></td>
+                                                <td>${chantier?.nom}</td>
+                                                <td><strong>${p.heures}h</strong></td>
+                                                <td><button class="btn btn-danger" onclick="handleDeletePointage(${p.id})">Supprimer</button></td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `}
+                    </div>
+
+                    <div class="card">
+                        <h2>Résumé par Ouvrier</h2>
+                        <div class="summary-grid">
+                            ${OUVRIERS.map(o => {
+                                const total = state.pointages.filter(p => p.ouvrierId === o.id).reduce((sum, p) => sum + p.heures, 0);
+                                const count = state.pointages.filter(p => p.ouvrierId === o.id).length;
+                                return `
+                                    <div class="summary-card">
+                                        <div class="summary-name">${o.nom}</div>
+                                        <div class="summary-stat">Pointages: <strong>${count}</strong></div>
+                                        <div class="summary-stat">Total heures: <strong style="color: #9966CC;">${total}h</strong></div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function attachLoginListeners() {
+            const loginBtn = document.querySelector('.login-section:first-child .btn');
+            const adminBtn = document.querySelector('.login-section:last-child .btn');
+            
+            if (loginBtn) {
+                loginBtn.onclick = handleLoginSubmit;
+                document.getElementById('login-nom').onkeypress = (e) => e.key === 'Enter' && handleLoginSubmit();
+                document.getElementById('login-password').onkeypress = (e) => e.key === 'Enter' && handleLoginSubmit();
+            }
+            
+            if (adminBtn) {
+                adminBtn.onclick = handleAdminLoginSubmit;
+                document.getElementById('admin-password').onkeypress = (e) => e.key === 'Enter' && handleAdminLoginSubmit();
+            }
+        }
+
+        function attachOuvrierListeners() {
+            // Events are attached inline in HTML
+        }
+
+        function attachAdminListeners() {
+            // Events are attached inline in HTML
+        }
+
+        // ===== INIT =====
+        loadState();
+        render();
+    </script>
+</body>
+</html>
