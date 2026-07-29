@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pointage Chantier - S2E</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --color-green: #669900;
+            --color-purple: #9966CC;
+            --color-light-green: #f0f4e8;
+            --color-light-purple: #f5f1fa;
+        }
+        
+        .logo-text {
+            font-weight: bold;
+            font-size: 24px;
+            letter-spacing: -1px;
+        }
+        .logo-s { color: #669900; }
+        .logo-e { color: #9966CC; }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #669900 0%, #7aa817 100%);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a8700 0%, #6b951a 100%);
+        }
+        
+        .btn-admin {
+            background: linear-gradient(135deg, #9966CC 0%, #a366dd 100%);
+        }
+        .btn-admin:hover {
+            background: linear-gradient(135deg, #8855bb 0%, #9255cc 100%);
+        }
+        
+        .border-green {
+            border-color: #669900;
+        }
+        
+        .text-green {
+            color: #669900;
+        }
+        
+        .text-purple {
+            color: #9966CC;
+        }
+        
+        .bg-light-green {
+            background-color: #f0f4e8;
+        }
+        
+        .bg-light-purple {
+            background-color: #f5f1fa;
+        }
+        
+        .week-day {
+            text-align: center;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .day-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .day-date {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .input-hours {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .input-hours:focus {
+            outline: none;
+            border-color: #669900;
+            box-shadow: 0 0 0 3px rgba(102, 153, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Données des ouvriers avec mots de passe
+        const OUVRIERS_DATA = [
+            { id: 1, nom: 'Nadeem', password: '1234' },
+            { id: 2, nom: 'Moujibullah', password: '1234' },
+            { id: 3, nom: 'Rock', password: '1234' },
+            { id: 4, nom: 'Yaya', password: '1234' },
+            { id: 5, nom: 'Bogdan', password: '1234' },
+            { id: 6, nom: 'Yaacoub', password: '1234' },
+            { id: 7, nom: 'Sardasayed', password: '1234' }
+        ];
+
+        const CHANTIERS = [
+            { id: 1, code: '016', nom: 'Paris 15', plans: ['Plan_Détail.pdf', 'Façade.pdf'] },
+            { id: 2, code: '011', nom: 'Evry', plans: ['Plan_Fondations.pdf', 'Toiture.pdf'] },
+            { id: 3, code: '033', nom: 'P10', plans: ['Plan_P10.pdf', 'Électricité.pdf'] },
+            { id: 4, code: '043', nom: 'Gonesse', plans: ['Plan_Gonesse.pdf', 'Cloisons.pdf'] }
+        ];
+
+        function PointageApp() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [loginInput, setLoginInput] = useState('');
+            const [passwordInput, setPasswordInput] = useState('');
+            const [adminPass, setAdminPass] = useState('');
+            const [pointages, setPointages] = useState([]);
+            const [currentWeek, setCurrentWeek] = useState(getMonday(new Date()));
+
+            useEffect(() => {
+                const savedPointages = localStorage.getItem('pointages');
+                if (savedPointages) {
+                    setPointages(JSON.parse(savedPointages));
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('pointages', JSON.stringify(pointages));
+            }, [pointages]);
+
+            function getMonday(date) {
+                const d = new Date(date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                return new Date(d.setDate(diff));
+            }
+
+            function getDaysOfWeek(monday) {
+                const days = [];
+                for (let i = 0; i < 6; i++) {
+                    const date = new Date(monday);
+                    date.setDate(date.getDate() + i);
+                    days.push(date);
+                }
+                return days;
+            }
+
+            const handleLogin = () => {
+                if (loginInput.trim() && passwordInput.trim()) {
+                    const ouvrier = OUVRIERS_DATA.find(o => 
+                        o.nom.toLowerCase() === loginInput.toLowerCase()
+                    );
+                    if (ouvrier && ouvrier.password === passwordInput) {
+                        setCurrentUser(ouvrier);
+                        setLoginInput('');
+                        setPasswordInput('');
+                    } else {
+                        alert('Nom ou mot de passe incorrect');
+                    }
+                }
+            };
+
+            const handleAdminLogin = () => {
+                if (adminPass === 'admin123') {
+                    setIsAdmin(true);
+                    setAdminPass('');
+                } else {
+                    alert('Mot de passe incorrect');
+                }
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setIsAdmin(false);
+            };
+
+            const addPointage = (date, chantierId, heures) => {
+                if (heures && chantierId) {
+                    setPointages([...pointages, {
+                        id: Date.now(),
+                        ouvrierId: currentUser.id,
+                        chantierId,
+                        heures: parseFloat(heures),
+                        date: date.toLocaleDateString('fr-FR')
+                    }]);
+                }
+            };
+
+            const deletePointage = (id) => {
+                setPointages(pointages.filter(p => p.id !== id));
+            };
+
+            const exportExcel = () => {
+                const data = pointages.map(p => ({
+                    Date: p.date,
+                    'Nom Ouvrier': OUVRIERS_DATA.find(o => o.id === p.ouvrierId)?.nom || '',
+                    'Code Affaire': CHANTIERS.find(c => c.id === p.chantierId)?.code || '',
+                    'Chantier': CHANTIERS.find(c => c.id === p.chantierId)?.nom || '',
+                    'Heures': p.heures
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 8 }];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
+                XLSX.writeFile(wb, `Pointages_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.xlsx`);
+            };
+
+            // Écran login
+            if (!currentUser && !isAdmin) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-50 to-purple-50 flex items-center justify-center p-4">
+                        <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8">
+                            <div className="flex justify-center mb-6">
+                                <div className="text-center">
+                                    <div className="logo-text mb-2">
+                                        <span className="logo-s">S</span><span className="logo-s">2</span><span className="logo-e">E</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600">Société Parisienne d'Équipement Électrique</p>
+                                </div>
+                            </div>
+
+                            <h1 className="text-2xl font-bold text-center text-green-700 mb-8">Pointage Chantier</h1>
+                            
+                            {/* Login Ouvrier */}
+                            <div className="mb-8">
+                                <h2 className="text-lg font-semibold text-gray-700 mb-4">Connexion</h2>
+                                <div className="space-y-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Votre nom"
+                                        value={loginInput}
+                                        onChange={(e) => setLoginInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder="Mot de passe"
+                                        value={passwordInput}
+                                        onChange={(e) => setPasswordInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
+                                    />
+                                    <button
+                                        onClick={handleLogin}
+                                        className="w-full btn-primary text-white py-2 rounded-lg font-semibold transition"
+                                    >
+                                        Se connecter
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-3 text-center">Mot de passe par défaut: 1234</p>
+                            </div>
+
+                            {/* Login Admin */}
+                            <div className="border-t pt-6">
+                                <h2 className="text-lg font-semibold text-gray-700 mb-4">🔐 Admin</h2>
+                                <div className="space-y-3">
+                                    <input
+                                        type="password"
+                                        placeholder="Mot de passe admin"
+                                        value={adminPass}
+                                        onChange={(e) => setAdminPass(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600"
+                                    />
+                                    <button
+                                        onClick={handleAdminLogin}
+                                        className="w-full btn-admin text-white py-2 rounded-lg font-semibold transition"
+                                    >
+                                        Accès Admin
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Interface Ouvrier
+            if (currentUser && !isAdmin) {
+                const daysOfWeek = getDaysOfWeek(currentWeek);
+                const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <header className="bg-gradient-to-r from-green-700 to-green-800 text-white p-4 shadow-lg">
+                            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                                <div>
+                                    <h1 className="text-2xl font-bold">Pointage Chantier</h1>
+                                    <p className="text-green-100 text-sm">S2E</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-green-100">{currentUser.nom}</span>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg transition"
+                                    >
+                                        Déconnexion
+                                    </button>
+                                </div>
+                            </div>
+                        </header>
+
+                        <main className="max-w-7xl mx-auto p-4 space-y-6">
+                            {/* Semaine */}
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <button
+                                        onClick={() => setCurrentWeek(new Date(currentWeek.getTime() - 7*24*60*60*1000))}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"
+                                    >
+                                        ← Semaine précédente
+                                    </button>
+                                    <h2 className="text-xl font-bold text-gray-800">
+                                        Semaine du {daysOfWeek[0].toLocaleDateString('fr-FR')} au {daysOfWeek[5].toLocaleDateString('fr-FR')}
+                                    </h2>
+                                    <button
+                                        onClick={() => setCurrentWeek(new Date(currentWeek.getTime() + 7*24*60*60*1000))}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"
+                                    >
+                                        Semaine suivante →
+                                    </button>
+                                </div>
+
+                                {/* Grille hebdomadaire */}
+                                <div className="space-y-6">
+                                    {daysOfWeek.map((date, dayIndex) => {
+                                        const dayPointages = pointages.filter(p => 
+                                            p.ouvrierId === currentUser.id && 
+                                            p.date === date.toLocaleDateString('fr-FR')
+                                        );
+                                        const dayTotalHours = dayPointages.reduce((sum, p) => sum + p.heures, 0);
+
+                                        return (
+                                            <div key={dayIndex} className="bg-light-green rounded-lg p-4 border-l-4 border-green-600">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-gray-800">{dayNames[dayIndex]}</h3>
+                                                        <p className="text-sm text-gray-600">{date.toLocaleDateString('fr-FR')}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-gray-600">Total du jour</p>
+                                                        <p className="text-2xl font-bold text-green-700">{dayTotalHours}h</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Pointages du jour */}
+                                                <div className="space-y-2 mb-4">
+                                                    {dayPointages.map(p => {
+                                                        const chantier = CHANTIERS.find(c => c.id === p.chantierId);
+                                                        return (
+                                                            <div key={p.id} className="flex justify-between items-center bg-white p-3 rounded border-l-4 border-green-500">
+                                                                <div>
+                                                                    <p className="font-semibold text-gray-800">{chantier?.code} - {chantier?.nom}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <p className="font-bold text-gray-800">{p.heures}h</p>
+                                                                    <button
+                                                                        onClick={() => deletePointage(p.id)}
+                                                                        className="text-red-600 hover:text-red-800 text-sm font-semibold"
+                                                                    >
+                                                                        Supprimer
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Ajouter pointage */}
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        onChange={(e) => {
+                                                            if (e.target.value) {
+                                                                const heures = prompt('Nombre d\'heures:');
+                                                                if (heures) {
+                                                                    addPointage(date, parseInt(e.target.value), heures);
+                                                                    e.target.value = '';
+                                                                }
+                                                            }
+                                                        }}
+                                                        defaultValue=""
+                                                        className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
+                                                    >
+                                                        <option value="">+ Ajouter un chantier</option>
+                                                        {CHANTIERS.map(c => (
+                                                            <option key={c.id} value={c.id}>{c.code} - {c.nom}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Total semaine */}
+                                <div className="mt-6 bg-gradient-to-r from-green-100 to-green-50 p-4 rounded-lg border-2 border-green-600">
+                                    <p className="text-gray-700">Total semaine: <span className="text-2xl font-bold text-green-700">
+                                        {pointages.filter(p => {
+                                            const pDate = new Date(p.date.split('/').reverse().join('-'));
+                                            return p.ouvrierId === currentUser.id && pDate >= currentWeek && pDate < new Date(currentWeek.getTime() + 7*24*60*60*1000);
+                                        }).reduce((sum, p) => sum + p.heures, 0)}h
+                                    </span></p>
+                                </div>
+                            </div>
+
+                            {/* Plans */}
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4">Plans Chantier</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {CHANTIERS.map(c => (
+                                        <div key={c.id} className="bg-light-green border-2 border-green-200 rounded-lg p-4">
+                                            <h3 className="font-semibold text-gray-800 mb-2">{c.code}</h3>
+                                            <p className="text-sm text-gray-600 mb-3">{c.nom}</p>
+                                            <div className="space-y-1">
+                                                {c.plans.map((plan, idx) => (
+                                                    <div key={idx} className="text-sm text-green-700">📄 {plan}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                );
+            }
+
+            // Interface Admin
+            if (isAdmin) {
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <header className="bg-gradient-to-r from-purple-700 to-purple-800 text-white p-4 shadow-lg">
+                            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                                <h1 className="text-2xl font-bold">Admin - Gestion Pointages</h1>
+                                <button
+                                    onClick={handleLogout}
+                                    className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg transition"
+                                >
+                                    Déconnexion
+                                </button>
+                            </div>
+                        </header>
+
+                        <main className="max-w-7xl mx-auto p-4 space-y-6">
+                            <div className="bg-white rounded-lg shadow-md p-4">
+                                <button
+                                    onClick={exportExcel}
+                                    className="btn-admin text-white px-6 py-3 rounded-lg font-semibold transition"
+                                >
+                                    📥 Exporter en Excel
+                                </button>
+                            </div>
+
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4">Tous les Pointages ({pointages.length})</h2>
+                                {pointages.length === 0 ? (
+                                    <p className="text-gray-500 text-center py-8">Aucun pointage enregistré</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left font-semibold">Date</th>
+                                                    <th className="px-4 py-2 text-left font-semibold">Ouvrier</th>
+                                                    <th className="px-4 py-2 text-left font-semibold">Code</th>
+                                                    <th className="px-4 py-2 text-left font-semibold">Chantier</th>
+                                                    <th className="px-4 py-2 text-left font-semibold">Heures</th>
+                                                    <th className="px-4 py-2 text-left font-semibold">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pointages.map(p => {
+                                                    const ouvrier = OUVRIERS_DATA.find(o => o.id === p.ouvrierId);
+                                                    const chantier = CHANTIERS.find(c => c.id === p.chantierId);
+                                                    return (
+                                                        <tr key={p.id} className="border-t hover:bg-gray-50">
+                                                            <td className="px-4 py-3">{p.date}</td>
+                                                            <td className="px-4 py-3 font-semibold">{ouvrier?.nom}</td>
+                                                            <td className="px-4 py-3 font-mono text-green-700">{chantier?.code}</td>
+                                                            <td className="px-4 py-3">{chantier?.nom}</td>
+                                                            <td className="px-4 py-3 font-semibold">{p.heures}h</td>
+                                                            <td className="px-4 py-3">
+                                                                <button
+                                                                    onClick={() => deletePointage(p.id)}
+                                                                    className="text-red-600 hover:text-red-800 font-semibold"
+                                                                >
+                                                                    Supprimer
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4">Résumé par Ouvrier</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {OUVRIERS_DATA.map(o => {
+                                        const totalHeures = pointages
+                                            .filter(p => p.ouvrierId === o.id)
+                                            .reduce((sum, p) => sum + p.heures, 0);
+                                        const nombrePointages = pointages.filter(p => p.ouvrierId === o.id).length;
+                                        
+                                        return (
+                                            <div key={o.id} className="bg-light-purple border-2 border-purple-200 rounded-lg p-4">
+                                                <h3 className="font-semibold text-gray-800">{o.nom}</h3>
+                                                <div className="mt-3 space-y-1 text-sm">
+                                                    <p>Pointages: <span className="font-semibold">{nombrePointages}</span></p>
+                                                    <p>Total heures: <span className="font-semibold text-purple-700">{totalHeures}h</span></p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                );
+            }
+        }
+
+        ReactDOM.render(<PointageApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
