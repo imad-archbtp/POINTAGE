@@ -74,6 +74,7 @@ td{padding:10px;border-bottom:1px solid #eee;font-size:13px}
 tr:hover td{background:#fafafa}
 .msg{padding:11px 14px;border-radius:6px;font-size:13px;margin-bottom:14px}
 .msg-err{background:#fdecec;border:1px solid #f0bcbc;color:#a32020}
+.msg-ok{background:#eaf7e0;border:1px solid #b9dfa0;color:#2e6a12;font-weight:600}
 .msg-info{background:#eef4fb;border:1px solid #bcd4f0;color:#20558a}
 .msg-warn{background:#fff6e0;border:1px solid #f0d68a;color:#7a5b00}
 .chargement{text-align:center;padding:50px 20px;color:#888;font-size:14px}
@@ -137,11 +138,22 @@ function appeler(donnees){
   if(API_URL.indexOf("script.google.com") === -1){
     return Promise.reject(new Error("L'adresse du serveur n'est pas encore renseignée dans le fichier (variable API_URL)."));
   }
-  return fetch(API_URL, { method:"POST", body: JSON.stringify(donnees) })
-    .then(function(r){ return r.json(); })
+  var controle = ("AbortController" in window) ? new AbortController() : null;
+  var expire = setTimeout(function(){ if(controle) controle.abort(); }, 30000);
+  var options = { method:"POST", body: JSON.stringify(donnees) };
+  if(controle) options.signal = controle.signal;
+  return fetch(API_URL, options)
+    .then(function(r){ clearTimeout(expire); return r.json(); })
     .then(function(j){
       if(!j.ok) throw new Error(j.erreur || "Erreur du serveur.");
       return j;
+    })
+    .catch(function(e){
+      clearTimeout(expire);
+      if(e && e.name === "AbortError"){
+        throw new Error("Le serveur met vraiment trop de temps à répondre (plus de 30 secondes). Vérifiez votre Google Sheet : la ligne a peut-être quand même été enregistrée avant de réessayer.");
+      }
+      throw e;
     });
 }
 function erreur(e){
@@ -151,6 +163,10 @@ function erreur(e){
   }
   state.message = m; state.typeMessage = "err";
   state.occupe = false; dessiner();
+  scrollHaut();
+}
+function scrollHaut(){
+  try{ window.scrollTo({top:0, behavior:"smooth"}); }catch(e){ window.scrollTo(0,0); }
 }
 
 /* ---------- Actions ---------- */
@@ -205,9 +221,27 @@ function ajouter(k){
   var h = parseFloat(String(inp.value).replace(",","."));
   if(!code){ state.message="Choisissez un chantier."; state.typeMessage="err"; dessiner(); return; }
   if(!(h>0) || h>24){ state.message="Saisissez un nombre d'heures valide (ex : 8 ou 7.5)."; state.typeMessage="err"; dessiner(); return; }
+
+  var nomCh = "";
+  for(var n=0;n<state.chantiers.length;n++) if(state.chantiers[n].code===code) nomCh = state.chantiers[n].nom;
+
+  var dejaPointe = 0;
+  for(var i=0;i<state.pointages.length;i++){
+    if(state.pointages[i].date===k && state.pointages[i].code===code) dejaPointe += state.pointages[i].heures;
+  }
+  if(dejaPointe > 0){
+    var poursuivre = confirm("Vous avez déjà "+arrondi(dejaPointe)+" h enregistrées sur "+code+" - "+nomCh+" ce jour-là.\nAjouter "+h+" h de plus ?");
+    if(!poursuivre) return;
+  }
+
   state.occupe = true; state.message = null; dessiner();
-  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h})
-    .then(chargerMes).catch(erreur);
+  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h}).then(function(){
+    state.message = "Enregistré : "+h+" h sur "+code+" - "+nomCh+" ("+affiche(k)+").";
+    state.typeMessage = "ok";
+    return chargerMes();
+  }).then(function(){
+    scrollHaut();
+  }).catch(erreur);
 }
 function supprimer(id){
   if(!confirm("Supprimer cette ligne ?")) return;
