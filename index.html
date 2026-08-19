@@ -51,10 +51,13 @@ input:focus,select:focus{outline:0;border-color:#669900}
 .line .code{font-size:12px;font-weight:700;color:#669900}
 .line .nom{font-size:14px;font-weight:600}
 .line .h{font-weight:700;font-size:17px;white-space:nowrap}
+.line .notes{font-size:12px;color:#666;margin-top:4px;white-space:pre-wrap;word-break:break-word}
 .empty{color:#999;font-size:13px;padding:4px 0 10px}
 .addrow{display:flex;gap:8px;flex-wrap:wrap}
 .addrow select{flex:2;min-width:150px}
 .addrow input{flex:1;min-width:90px}
+.notes-input{width:100%;margin-top:8px;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical}
+.notes-input:focus{outline:0;border-color:#669900}
 .wtot{background:#e9f0da;border:2px solid #669900;border-radius:6px;padding:16px;text-align:center;margin-top:6px}
 .wtot .n{font-size:30px;font-weight:800;color:#669900}
 .wtot .l{font-size:13px;color:#555}
@@ -216,9 +219,10 @@ function semSuiv(){ state.lundi = jourPlus(state.lundi,7); dessiner(); }
 function semAuj(){ state.lundi = lundiDe(new Date()); dessiner(); }
 
 function ajouter(k){
-  var sel = document.getElementById("ch-"+k), inp = document.getElementById("hr-"+k);
+  var sel = document.getElementById("ch-"+k), inp = document.getElementById("hr-"+k), ntEl = document.getElementById("nt-"+k);
   var code = sel.value;
   var h = parseFloat(String(inp.value).replace(",","."));
+  var notes = ntEl ? (ntEl.value||"").trim().substring(0,200) : "";
   if(!code){ state.message="Choisissez un chantier."; state.typeMessage="err"; dessiner(); return; }
   if(!(h>0) || h>24){ state.message="Saisissez un nombre d'heures valide (ex : 8 ou 7.5)."; state.typeMessage="err"; dessiner(); return; }
 
@@ -235,7 +239,7 @@ function ajouter(k){
   }
 
   state.occupe = true; state.message = null; dessiner();
-  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h}).then(function(){
+  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h, notes:notes}).then(function(){
     state.message = "Enregistré : "+h+" h sur "+code+" - "+nomCh+" ("+affiche(k)+").";
     state.typeMessage = "ok";
     return chargerMes();
@@ -256,14 +260,14 @@ function supprimer(id){
 function exportExcel(){
   if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
   var l = state.pointages.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
-  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th></tr>';
+  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th><th>Notes</th></tr>';
   var tot = 0;
   for(var i=0;i<l.length;i++){
     tot += l[i].heures;
     t += '<tr><td>'+affiche(l[i].date)+'</td><td>'+esc(l[i].ouvrier)+'</td><td>'+esc(l[i].code)
-      +  '</td><td>'+esc(l[i].chantier)+'</td><td>'+l[i].heures+'</td></tr>';
+      +  '</td><td>'+esc(l[i].chantier)+'</td><td>'+l[i].heures+'</td><td>'+esc(l[i].notes||"")+'</td></tr>';
   }
-  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td></tr></table>';
+  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td><td></td></tr></table>';
   var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
     + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
     + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
@@ -338,7 +342,9 @@ function vueOuvrier(){
     if(duJour.length === 0) h += '<div class="empty">Aucune heure saisie.</div>';
     for(var m=0;m<duJour.length;m++){
       h += '<div class="line"><div class="info"><div class="code">'+esc(duJour[m].code)+'</div>'
-        +  '<div class="nom">'+esc(duJour[m].chantier)+'</div></div>'
+        +  '<div class="nom">'+esc(duJour[m].chantier)+'</div>'
+        +  (duJour[m].notes ? '<div class="notes">'+esc(duJour[m].notes)+'</div>' : '')
+        +  '</div>'
         +  '<div class="h">'+duJour[m].heures+' h</div>'
         +  '<button type="button" class="btn btn-danger" onclick="supprimer(\''+esc(duJour[m].id)+'\')"'+dis+'>Supprimer</button></div>';
     }
@@ -347,7 +353,9 @@ function vueOuvrier(){
       h += '<option value="'+esc(state.chantiers[n].code)+'">'+esc(state.chantiers[n].code+" - "+state.chantiers[n].nom)+'</option>';
     }
     h += '</select><input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures"'+dis+'>'
-      +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div></div>';
+      +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div>'
+      +  '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'></textarea>'
+      +  '</div>';
   }
 
   h += '<div class="wtot"><div class="l">Total de la semaine</div><div class="n">'+arrondi(totSem)+' h</div></div></div>';
@@ -382,11 +390,12 @@ function vueAdmin(){
   if(l.length === 0){
     h += '<div class="empty">Aucun pointage enregistré.</div>';
   } else {
-    h += '<div class="tw"><table><thead><tr><th>Date</th><th>Ouvrier</th><th>Code</th><th>Chantier</th><th>Heures</th><th></th></tr></thead><tbody>';
+    h += '<div class="tw"><table><thead><tr><th>Date</th><th>Ouvrier</th><th>Code</th><th>Chantier</th><th>Heures</th><th>Notes</th><th></th></tr></thead><tbody>';
     for(var i=0;i<l.length;i++){
       h += '<tr><td>'+affiche(l[i].date)+'</td><td><b>'+esc(l[i].ouvrier)+'</b></td>'
         +  '<td style="color:#669900;font-weight:700">'+esc(l[i].code)+'</td><td>'+esc(l[i].chantier)+'</td>'
         +  '<td><b>'+l[i].heures+' h</b></td>'
+        +  '<td style="max-width:260px;white-space:pre-wrap;word-break:break-word">'+esc(l[i].notes||"")+'</td>'
         +  '<td><button type="button" class="btn btn-danger" onclick="supprimer(\''+esc(l[i].id)+'\')"'+dis+'>Supprimer</button></td></tr>';
     }
     h += '</tbody></table></div>';
