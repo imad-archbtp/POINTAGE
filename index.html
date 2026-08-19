@@ -58,6 +58,8 @@ input:focus,select:focus{outline:0;border-color:#669900}
 .addrow input{flex:1;min-width:90px}
 .notes-input{width:100%;margin-top:8px;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical}
 .notes-input:focus{outline:0;border-color:#669900}
+.noterow{width:100%;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.btn-note{font-size:13px;padding:8px 14px}
 .wtot{background:#e9f0da;border:2px solid #669900;border-radius:6px;padding:16px;text-align:center;margin-top:6px}
 .wtot .n{font-size:30px;font-weight:800;color:#669900}
 .wtot .l{font-size:13px;color:#555}
@@ -364,7 +366,10 @@ function vueOuvrier(){
     }
     h += '</select><input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures"'+dis+'>'
       +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div>'
-      +  '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'></textarea>'
+      +  '<div class="noterow">'
+      +    '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'></textarea>'
+      +    '<button type="button" class="btn btn-secondary btn-note" onclick="ajouter(\''+k+'\')"'+dis+'>Valider la note</button>'
+      +  '</div>'
       +  '</div>';
   }
 
