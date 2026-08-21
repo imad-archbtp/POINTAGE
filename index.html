@@ -383,7 +383,7 @@ function vueOuvrier(){
       h += '<span class="aucun">Aucun plan disponible</span>';
     } else {
       for(var r=0;r<c.plans.length;r++){
-        h += '<a href="'+esc(lienPlan(c.code, c.plans[r]))+'" target="_blank" rel="noopener">'+esc(c.plans[r])+'</a>' + (r<c.plans.length-1 ? '<br>' : '');
+        h += '<a href="'+esc(lienPlan(c.code, c.plans[r]))+'" >'+esc(c.plans[r])+'</a>' + (r<c.plans.length-1 ? '<br>' : '');
       }
     }
     h += '</div></div>';
