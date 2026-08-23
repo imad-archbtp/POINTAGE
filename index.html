@@ -107,6 +107,17 @@ var PLANS_BASE = "https://imad-archbtp.github.io/POINTAGE/plans/";
 function lienPlan(code, nomFichier){
   return PLANS_BASE + encodeURIComponent(String(code).trim()) + "/" + encodeURIComponent(String(nomFichier).trim());
 }
+/* Ouvre le PDF dans un nouvel onglet quand c'est possible (Safari, Chrome...).
+   Si le navigateur bloque l'ouverture d'un nouvel onglet (cas des navigateurs
+   intégrés WhatsApp/SMS), on retombe sur une ouverture dans le même onglet. */
+function ouvrirPlan(url){
+  try{
+    var f = window.open(url, "_blank");
+    if(f){ try{ f.opener = null; }catch(e){} return false; }
+  }catch(e){}
+  window.location.href = url;
+  return false;
+}
 
 var state = {
   nom: null, mdp: null, admin: false,
@@ -383,7 +394,8 @@ function vueOuvrier(){
       h += '<span class="aucun">Aucun plan disponible</span>';
     } else {
       for(var r=0;r<c.plans.length;r++){
-        h += '<a href="'+esc(lienPlan(c.code, c.plans[r]))+'" >'+esc(c.plans[r])+'</a>' + (r<c.plans.length-1 ? '<br>' : '');
+        var urlPlan = lienPlan(c.code, c.plans[r]);
+        h += '<a href="'+esc(urlPlan)+'" onclick="return ouvrirPlan(this.href)" rel="noopener">'+esc(c.plans[r])+'</a>' + (r<c.plans.length-1 ? '<br>' : '');
       }
     }
     h += '</div></div>';
