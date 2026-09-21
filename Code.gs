@@ -246,6 +246,12 @@ function lireOuvriers() {
   return litAvecCache('ouvriers', lireOuvriersFeuille);
 }
 
+/**
+ * Version NON mise en cache. A utiliser imperativement partout ou l'on se sert
+ * du numero de ligne (`ligne`) pour ecrire ou supprimer dans la feuille : un
+ * numero issu du cache peut etre perime si quelqu'un a edite l'onglet Ouvriers
+ * a la main entre-temps, et l'on modifierait alors le mauvais ouvrier.
+ */
 function lireOuvriersFeuille() {
   var v = valeurs('Ouvriers', 3);
   var t = [];
@@ -497,7 +503,7 @@ function traiter(d, a) {
       if (!nNom) return reponse({ ok: false, erreur: 'Le nom est obligatoire.' });
       if (nMdp.length < 4) return reponse({ ok: false, erreur: "Le code d'acces doit faire au moins 4 caracteres." });
 
-      var l = lireOuvriers(), maxId = 0;
+      var l = lireOuvriersFeuille(), maxId = 0;
       for (var m = 0; m < l.length; m++) {
         if (normNom(l[m].nom) === normNom(nNom)) {
           return reponse({ ok: false, erreur: 'Un ouvrier porte deja ce nom.' });
@@ -521,7 +527,7 @@ function traiter(d, a) {
       var cNom = String(d.nouveauNom || '').trim();
       var cMdp = String(d.nouveauMdp || '').trim();
       if (cMdp.length < 4) return reponse({ ok: false, erreur: "Le code d'acces doit faire au moins 4 caracteres." });
-      var lc2 = lireOuvriers();
+      var lc2 = lireOuvriersFeuille();
       for (var q = 0; q < lc2.length; q++) {
         if (normNom(lc2[q].nom) === normNom(cNom)) {
           var sc = feuille('Ouvriers').getRange(lc2[q].ligne, 3);
@@ -537,7 +543,7 @@ function traiter(d, a) {
     if (a === 'supprimerOuvrier') {
       if (!estAdmin(d)) return reponse({ ok: false, erreur: 'Acces refuse.' });
       var sNom = String(d.nouveauNom || '').trim();
-      var ls = lireOuvriers();
+      var ls = lireOuvriersFeuille();
       for (var z = 0; z < ls.length; z++) {
         if (normNom(ls[z].nom) === normNom(sNom)) {
           // Les pointages deja saisis sont conserves : seul l'acces est supprime.
