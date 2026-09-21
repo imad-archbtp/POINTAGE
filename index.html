@@ -301,6 +301,24 @@ function supprimer(id){
   appeler(d).then(state.admin ? chargerTous : chargerMes).catch(erreur);
 }
 
+/* La note du jour n'est pas une ligne de pointage : elle se pose sur les heures deja
+   saisies ce jour-la. Ce bouton appelait "ajouter", qui exigeait un chantier et des
+   heures, et repondait donc invariablement "Choisissez un chantier". */
+function validerNote(k){
+  var el = document.getElementById("nt-"+k);
+  var notes = el ? (el.value||"").trim().substring(0,200) : "";
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"noterJour", nom:state.nom, mdp:state.mdp, date:k, notes:notes}).then(function(){
+    state.message = notes
+      ? "Note du "+affiche(k)+" enregistrée."
+      : "Note du "+affiche(k)+" effacée.";
+    state.typeMessage = "ok";
+    return chargerMes();
+  }).then(function(){
+    scrollHaut();
+  }).catch(erreur);
+}
+
 /* ---------- Gestion des ouvriers (admin) ---------- */
 function ajouterOuvrier(){
   var nom = (document.getElementById("o-nom").value||"").trim();
@@ -436,6 +454,10 @@ function vueOuvrier(){
       if(state.pointages[j].date === k){ duJour.push(state.pointages[j]); totJour += state.pointages[j].heures; }
     }
     totSem += totJour;
+    // La note est portee par les lignes du jour : on reaffiche celle deja enregistree
+    // pour qu'elle soit modifiable plutot que d'avoir a la retaper.
+    var noteJour = "";
+    for(var nj=0;nj<duJour.length;nj++){ if(duJour[nj].notes){ noteJour = duJour[nj].notes; break; } }
     h += '<div class="day"><div class="day-h">'
       +  '<div><div class="day-name">'+JOURS[i]+'</div><div class="day-date">'+affiche(k)+'</div></div>'
       +  '<div class="day-tot"><small>Total du jour</small>'+arrondi(totJour)+' h</div></div>';
@@ -455,8 +477,8 @@ function vueOuvrier(){
     h += '</select><input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures"'+dis+'>'
       +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div>'
       +  '<div class="noterow">'
-      +    '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'></textarea>'
-      +    '<button type="button" class="btn btn-secondary btn-note" onclick="ajouter(\''+k+'\')"'+dis+'>Valider la note</button>'
+      +    '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'>'+esc(noteJour)+'</textarea>'
+      +    '<button type="button" class="btn btn-secondary btn-note" onclick="validerNote(\''+k+'\')"'+dis+'>Valider la note</button>'
       +  '</div>'
       +  '</div>';
   }
