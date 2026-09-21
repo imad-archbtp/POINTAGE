@@ -207,11 +207,19 @@ function scrollHaut(){
 function chargerNoms(){
   if(state.nomsCharges) return;
   state.nomsCharges = true;
+  /* La liste est d'abord relue du cache local : l'ouvrier voit son nom
+     immediatement, sans attendre le serveur. Le rafraichissement se fait
+     ensuite en arriere-plan. En cas d'echec reseau on garde le cache plutot
+     que de retomber sur la saisie libre. */
+  try{
+    var cache = localStorage.getItem("sp2e_ouvriers");
+    if(cache) state.listeNoms = JSON.parse(cache) || [];
+  }catch(e){}
   appeler({action:"ouvriers"}).then(function(j){
     state.listeNoms = j.ouvriers || [];
+    try{ localStorage.setItem("sp2e_ouvriers", JSON.stringify(state.listeNoms)); }catch(e2){}
     if(!state.nom && !state.admin) dessiner();
   }).catch(function(){
-    state.listeNoms = [];
     if(!state.nom && !state.admin) dessiner();
   });
 }
@@ -224,6 +232,9 @@ function connexion(){
     state.nom = j.nom; state.mdp = mdp; state.admin = false;
     state.chantiers = j.chantiers; state.lundi = lundiDe(new Date());
     memoriser();
+    /* Le serveur renvoie desormais les pointages avec la connexion : un
+       aller-retour de moins avant de voir sa semaine. */
+    if(j.pointages){ state.pointages = j.pointages; state.occupe = false; dessiner(); return; }
     return chargerMes();
   }).catch(erreur);
 }
@@ -854,7 +865,9 @@ document.addEventListener("keydown", function(e){
   } else if(s && s.nom){
     state.nom = s.nom; state.mdp = s.mdp;
     appeler({action:"login", nom:s.nom, mdp:s.mdp}).then(function(j){
-      state.chantiers = j.chantiers; return chargerMes();
+      state.chantiers = j.chantiers;
+      if(j.pointages){ state.pointages = j.pointages; state.occupe = false; dessiner(); return; }
+      return chargerMes();
     }).catch(function(){ deconnexion(); });
   } else {
     dessiner();

@@ -204,8 +204,21 @@ function memeMdp(stocke, saisi) {
   return false;
 }
 
+/**
+ * Lecture bornee a la derniere ligne reellement remplie. getDataRange() inclut
+ * les lignes seulement mises en forme : un format Texte applique a une colonne
+ * entiere suffit a faire relire des milliers de lignes vides a chaque appel.
+ */
+function valeurs(nomFeuille, nbColonnes) {
+  var sh = feuille(nomFeuille);
+  if (!sh) return [];
+  var n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(1, 1, n, nbColonnes).getValues();
+}
+
 function lireOuvriers() {
-  var v = feuille('Ouvriers').getDataRange().getValues();
+  var v = valeurs('Ouvriers', 3);
   var t = [];
   for (var i = 1; i < v.length; i++) {
     if (String(v[i][1]).trim() === '') continue;
@@ -223,8 +236,16 @@ function nomsOuvriers() {
   return lireOuvriers().map(function (x) { return x.nom; });
 }
 
+function pointagesDe(nom) {
+  var tous = lirePointages(), mes = [], c = normNom(nom);
+  for (var i = 0; i < tous.length; i++) {
+    if (normNom(tous[i].ouvrier) === c) mes.push(tous[i]);
+  }
+  return mes;
+}
+
 function lireChantiers() {
-  var v = feuille('Chantiers').getDataRange().getValues();
+  var v = valeurs('Chantiers', 3);
   var t = [];
   for (var i = 1; i < v.length; i++) {
     if (v[i][0] === '') continue;
@@ -240,7 +261,7 @@ function lireChantiers() {
 }
 
 function lirePointages() {
-  var v = feuille('Pointages').getDataRange().getValues();
+  var v = valeurs('Pointages', 7);
   var t = [];
   for (var i = 1; i < v.length; i++) {
     if (v[i][0] === '') continue;
@@ -280,13 +301,47 @@ function reponse(obj) {
 
 /* ---------- Point d'entree ---------- */
 
+/* Seules ces actions modifient le classeur. Les autres ne font que lire.
+   Avant, TOUTE requete prenait le verrou exclusif : les consultations se
+   serialisaient entre elles, et en fin de journee, quand les equipes pointent
+   en meme temps, l'attente cumulee depassait les 30 secondes du navigateur.
+   L'ouvrier voyait "le serveur met vraiment trop de temps a repondre" alors que
+   le serveur ne faisait qu'attendre son tour. */
+var ACTIONS_ECRITURE = {
+  ajouter: 1, supprimer: 1, noterJour: 1,
+  ajouterOuvrier: 1, changerMdpOuvrier: 1, supprimerOuvrier: 1
+};
+
 function doPost(e) {
+  var d, a;
+  try {
+    d = JSON.parse(e.postData.contents);
+    a = d.action;
+  } catch (errLecture) {
+    return reponse({ ok: false, erreur: 'Requete illisible.' });
+  }
+
+  if (!ACTIONS_ECRITURE[a]) {
+    try {
+      return traiter(d, a);
+    } catch (errSansVerrou) {
+      return reponse({ ok: false, erreur: String(errSansVerrou) });
+    }
+  }
+
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
-    var d = JSON.parse(e.postData.contents);
-    var a = d.action;
+    return traiter(d, a);
+  } catch (errAvecVerrou) {
+    return reponse({ ok: false, erreur: String(errAvecVerrou) });
+  } finally {
+    try { lock.releaseLock(); } catch (e2) {}
+  }
+}
 
+function traiter(d, a) {
+  {
     /* Liste des prenoms, pour alimenter le menu deroulant de la page de connexion.
        Ne renvoie aucun code d'acces. */
     if (a === 'ouvriers') {
@@ -296,7 +351,10 @@ function doPost(e) {
     if (a === 'login') {
       var o = verifier(d.nom, d.mdp);
       if (!o) return reponse({ ok: false, erreur: 'Nom ou code incorrect.' });
-      return reponse({ ok: true, nom: o.nom, chantiers: lireChantiers() });
+      /* On renvoie les pointages des la connexion : l'ouvrier voyait sa semaine
+         apres deux allers-retours, chacun a plusieurs secondes sur un telephone
+         en 4G de chantier. */
+      return reponse({ ok: true, nom: o.nom, chantiers: lireChantiers(), pointages: pointagesDe(o.nom) });
     }
 
     if (a === 'loginAdmin') {
@@ -313,12 +371,7 @@ function doPost(e) {
     if (a === 'mes') {
       var u = verifier(d.nom, d.mdp);
       if (!u) return reponse({ ok: false, erreur: 'Session expiree.' });
-      var tous = lirePointages();
-      var mes = [];
-      for (var i = 0; i < tous.length; i++) {
-        if (normNom(tous[i].ouvrier) === normNom(u.nom)) mes.push(tous[i]);
-      }
-      return reponse({ ok: true, pointages: mes });
+      return reponse({ ok: true, pointages: pointagesDe(u.nom) });
     }
 
     if (a === 'ajouter') {
@@ -452,10 +505,6 @@ function doPost(e) {
     }
 
     return reponse({ ok: false, erreur: 'Action inconnue.' });
-  } catch (err) {
-    return reponse({ ok: false, erreur: String(err) });
-  } finally {
-    try { lock.releaseLock(); } catch (e2) {}
   }
 }
 
