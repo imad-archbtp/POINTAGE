@@ -217,7 +217,36 @@ function valeurs(nomFeuille, nbColonnes) {
   return sh.getRange(1, 1, n, nbColonnes).getValues();
 }
 
+/**
+ * Ouvriers et chantiers sont relus a CHAQUE requete, y compris avant chaque
+ * saisie d'heures, alors qu'ils ne changent quasiment jamais. Chaque lecture est
+ * un aller-retour vers Sheets, et pour une ecriture cela se passe a l'interieur
+ * du verrou : c'est ce qui faisait durer une saisie plusieurs secondes et mettait
+ * les ouvriers en file d'attente en fin de journee.
+ * Le cache est vide des qu'un ouvrier est ajoute, modifie ou retire.
+ */
+var CACHE_SECONDES = 120;
+
+function litAvecCache(clef, produire) {
+  var cache = CacheService.getScriptCache();
+  try {
+    var brut = cache.get(clef);
+    if (brut) return JSON.parse(brut);
+  } catch (e) {}
+  var valeur = produire();
+  try { cache.put(clef, JSON.stringify(valeur), CACHE_SECONDES); } catch (e2) {}
+  return valeur;
+}
+
+function viderCache() {
+  try { CacheService.getScriptCache().removeAll(['ouvriers', 'chantiers']); } catch (e) {}
+}
+
 function lireOuvriers() {
+  return litAvecCache('ouvriers', lireOuvriersFeuille);
+}
+
+function lireOuvriersFeuille() {
   var v = valeurs('Ouvriers', 3);
   var t = [];
   for (var i = 1; i < v.length; i++) {
@@ -245,6 +274,10 @@ function pointagesDe(nom) {
 }
 
 function lireChantiers() {
+  return litAvecCache('chantiers', lireChantiersFeuille);
+}
+
+function lireChantiersFeuille() {
   var v = valeurs('Chantiers', 3);
   var t = [];
   for (var i = 1; i < v.length; i++) {
@@ -386,15 +419,16 @@ function traiter(d, a) {
 
       var id = String(new Date().getTime()) + String(Math.floor(Math.random() * 1000));
       var sh = feuille('Pointages');
-      // 7e colonne : la note du jour. Avant, appendRow n'ecrivait que 6 valeurs et
-      // toutes les notes saisies par les ouvriers etaient perdues sans message.
-      sh.appendRow([id, String(d.date), u2.nom, ch.code, ch.nom, h, texteNote(d.notes)]);
-      // Reecrit la cellule en texte explicitement : sans cette ligne, Sheets convertit
-      // silencieusement "2026-07-28" en vraie date, ce qui casse le regroupement par jour.
-      var ligne = sh.getLastRow();
-      var celluleDate = sh.getRange(ligne, 2);
-      celluleDate.setNumberFormat('@');
-      celluleDate.setValue(String(d.date));
+      /* Une seule pose de format puis une seule ecriture. La version precedente
+         enchainait appendRow, getLastRow, setNumberFormat et setValue : quatre
+         allers-retours vers Sheets, tous a l'interieur du verrou, donc payes par
+         tous les ouvriers en attente derriere.
+         Le format Texte sur la date et le code est indispensable : sinon Sheets
+         convertit "2026-07-28" en vraie date et "016" en nombre 16. */
+      var ligne = sh.getLastRow() + 1;
+      var plage = sh.getRange(ligne, 1, 1, 7);
+      plage.setNumberFormats([['@', '@', '@', '@', '@', 'General', '@']]);
+      plage.setValues([[id, String(d.date), u2.nom, ch.code, ch.nom, h, texteNote(d.notes)]]);
       return reponse({ ok: true, id: id });
     }
 
@@ -470,6 +504,7 @@ function traiter(d, a) {
       var cel = so.getRange(so.getLastRow(), 3);
       cel.setNumberFormat('@');
       cel.setValue(nMdp);
+      viderCache();
       return reponse({ ok: true, ouvriers: nomsOuvriers() });
     }
 
@@ -484,6 +519,7 @@ function traiter(d, a) {
           var sc = feuille('Ouvriers').getRange(lc2[q].ligne, 3);
           sc.setNumberFormat('@');
           sc.setValue(cMdp);
+          viderCache();
           return reponse({ ok: true, ouvriers: nomsOuvriers() });
         }
       }
@@ -498,6 +534,7 @@ function traiter(d, a) {
         if (normNom(ls[z].nom) === normNom(sNom)) {
           // Les pointages deja saisis sont conserves : seul l'acces est supprime.
           feuille('Ouvriers').deleteRow(ls[z].ligne);
+          viderCache();
           return reponse({ ok: true, ouvriers: nomsOuvriers() });
         }
       }
