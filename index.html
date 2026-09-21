@@ -378,20 +378,6 @@ function moisDisponibles(){
   return t;
 }
 
-function telechargerClasseur(corps, nomFichier){
-  var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
-    + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
-    + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
-    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>'+corps+'</body></html>';
-  /* BOM en tete, sinon Excel affiche les accents en mojibake */
-  var bom = String.fromCharCode(65279);
-  var url = URL.createObjectURL(new Blob([bom+doc],{type:"application/vnd.ms-excel;charset=utf-8"}));
-  var a = document.createElement("a");
-  a.href = url; a.download = nomFichier;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
-}
-
 /* Meme normalisation que le serveur : "Nadeem", "nadeem" et "NADEEM" doivent compter
    pour une seule personne. Sans cela, un nom reecrit dans la feuille scinderait le
    total d'un ouvrier en deux lignes, et la paie ne verrait rien. */
@@ -417,43 +403,179 @@ function triPaie(a,b){
   return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
 }
 
-/* Recapitulatif en tete de fichier : c'est lui que la RH lit. Le detail qui suit
-   ne sert qu'a justifier les totaux. */
-function tableauRecap(lignes){
+/* Mise en forme reconnue par Excel a l'ouverture d'un classeur HTML.
+   mso-number-format:"\@" force le format Texte : sans lui Excel transforme
+   le code affaire 016 en nombre 16. */
+var STYLE_XLS = '<style>'
+  + 'table{border-collapse:collapse}'
+  + 'td,th{font-family:Calibri,Arial,sans-serif;font-size:11.0pt;'
+  +       'border:0.5pt solid #c8d9ae;padding:3px 7px;vertical-align:middle}'
+  + 'th{background:#669900;color:#ffffff;font-weight:bold;text-align:left}'
+  + '.titre{font-size:16.0pt;font-weight:bold;color:#4c7300;border:none}'
+  + '.sstitre{font-size:9.0pt;color:#808080;border:none}'
+  + '.vide{border:none}'
+  + '.grp{background:#eef4e2;font-weight:bold;color:#4c7300}'
+  + '.sous{background:#e2ecd0;font-weight:bold}'
+  + '.tot{background:#669900;color:#ffffff;font-weight:bold}'
+  + '.h{text-align:right}'
+  + '.txt{mso-number-format:"\\@"}'
+  + '</style>';
+
+/* Excel ignore le BOM et la declaration d'encodage a l'ouverture d'un classeur
+   HTML : "août" arrive en "aoÃ»t". En revanche il decode toujours les entites
+   HTML. On convertit donc tout caractere non-ASCII en entite numerique, ce qui
+   rend le fichier insensible a l'encodage suppose par Excel. */
+function versEntites(s){
+  var t = String(s), out = "";
+  for(var i=0;i<t.length;i++){
+    var c = t.charCodeAt(i);
+    out += (c > 126) ? ("&#" + c + ";") : t.charAt(i);
+  }
+  return out;
+}
+
+function telechargerClasseur(corps, nomFichier){
+  /* Excel n'interprete pas la forme courte <meta charset>. Sans l'en-tete
+     http-equiv ci-dessous, "août" arrive dans la feuille en "aoÃ»t". */
+  var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head>'
+    + '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">'
+    + '<meta charset="UTF-8">'
+    + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+    + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
+    + STYLE_XLS + '</head><body>' + versEntites(corps) + '</body></html>';
+  /* BOM en tete, sinon Excel affiche les accents en mojibake */
+  var bom = String.fromCharCode(65279);
+  var url = URL.createObjectURL(new Blob([bom+doc],{type:"application/vnd.ms-excel;charset=utf-8"}));
+  var a = document.createElement("a");
+  a.href = url; a.download = nomFichier;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+}
+
+function enTeteClasseur(titre, nbColonnes){
+  return '<table><tr><td class="titre" colspan="'+nbColonnes+'">'+esc(titre)+'</td></tr>'
+       + '<tr><td class="sstitre" colspan="'+nbColonnes+'">SP2E &ndash; édité le '+affiche(cle(new Date()))+'</td></tr>'
+       + '</table><br>';
+}
+
+/* Regroupe les lignes par ouvrier : heures, nombre de jours distincts, et
+   repartition par mois. Sert aussi bien au recapitulatif mensuel qu'au
+   tableau croise de l'export global. */
+function regrouperParOuvrier(lignes){
   var clefs = [], parClef = {};
   for(var i=0;i<lignes.length;i++){
     var c = clefOuvrier(lignes[i].ouvrier);
     if(!Object.prototype.hasOwnProperty.call(parClef,c)){
-      parClef[c] = { nom: nomCanonique(lignes[i].ouvrier), heures:0, jours:{} };
+      parClef[c] = { nom: nomCanonique(lignes[i].ouvrier), heures:0, jours:{}, parMois:{} };
       clefs.push(c);
     }
-    parClef[c].heures += lignes[i].heures;
-    parClef[c].jours[lignes[i].date] = 1;
+    var e = parClef[c];
+    e.heures += lignes[i].heures;
+    e.jours[lignes[i].date] = 1;
+    var m = moisDe(lignes[i].date);
+    e.parMois[m] = (e.parMois[m] || 0) + lignes[i].heures;
   }
   clefs.sort();
-  var t = '<table border="1"><tr><th>Ouvrier</th><th>Jours travaillés</th><th>Total heures</th></tr>';
-  var tot = 0;
+  var t = [];
   for(var k=0;k<clefs.length;k++){
-    var e = parClef[clefs[k]], nb = 0;
-    for(var d in e.jours){ if(Object.prototype.hasOwnProperty.call(e.jours,d)) nb++; }
-    tot += e.heures;
-    t += '<tr><td>'+esc(e.nom)+'</td><td>'+nb+'</td><td>'+arrondi(e.heures)+'</td></tr>';
+    var x = parClef[clefs[k]], nb = 0;
+    for(var d in x.jours){ if(Object.prototype.hasOwnProperty.call(x.jours,d)) nb++; }
+    x.nbJours = nb;
+    t.push(x);
   }
-  t += '<tr><td><b>TOTAL</b></td><td></td><td><b>'+arrondi(tot)+'</b></td></tr></table>';
-  return { html: t, total: tot, nbOuvriers: clefs.length };
+  return t;
 }
 
-function tableauDetail(lignes){
-  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th>'
-        + '<th>Chantier</th><th>Heures</th><th>Notes</th></tr>';
-  var tot = 0;
-  for(var i=0;i<lignes.length;i++){
-    tot += lignes[i].heures;
-    t += '<tr><td>'+affiche(lignes[i].date)+'</td><td>'+esc(lignes[i].ouvrier)+'</td><td>'+esc(lignes[i].code)
-      +  '</td><td>'+esc(lignes[i].chantier)+'</td><td>'+lignes[i].heures+'</td><td>'+esc(lignes[i].notes||"")+'</td></tr>';
+/* Recapitulatif d'un mois : une ligne par ouvrier. C'est ce que la paie lit,
+   le detail qui suit ne sert qu'a justifier les totaux. */
+function tableauRecapMois(groupes){
+  var t = '<table><tr><th>Ouvrier</th><th>Jours travaillés</th><th>Total heures</th></tr>';
+  var tot = 0, totJours = 0;
+  for(var i=0;i<groupes.length;i++){
+    tot += groupes[i].heures;
+    totJours += groupes[i].nbJours;
+    t += '<tr><td>'+esc(groupes[i].nom)+'</td><td class="h">'+groupes[i].nbJours+'</td>'
+      +  '<td class="h">'+arrondi(groupes[i].heures)+'</td></tr>';
   }
-  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td><td></td></tr></table>';
+  t += '<tr class="tot"><td>TOTAL</td><td class="h">'+totJours+'</td>'
+    +  '<td class="h">'+arrondi(tot)+'</td></tr></table>';
   return t;
+}
+
+/* Tableau croise ouvriers x mois : le total de chaque ouvrier, mois par mois. */
+function tableauCroise(groupes, mois){
+  /* class="txt" sur les mois : sinon Excel lit "juillet 2026" comme une date
+     et l'affiche "juil-26" dans l'en-tete du tableau. */
+  var t = '<table><tr><th>Ouvrier</th>';
+  for(var m=0;m<mois.length;m++) t += '<th class="txt">'+esc(libelleMois(mois[m]))+'</th>';
+  t += '<th>Total</th></tr>';
+  var totCol = [], totGen = 0;
+  for(var z=0;z<mois.length;z++) totCol[z] = 0;
+  for(var i=0;i<groupes.length;i++){
+    t += '<tr><td>'+esc(groupes[i].nom)+'</td>';
+    for(var j=0;j<mois.length;j++){
+      var v = groupes[i].parMois[mois[j]] || 0;
+      totCol[j] += v;
+      t += '<td class="h">'+(v ? arrondi(v) : '')+'</td>';
+    }
+    totGen += groupes[i].heures;
+    t += '<td class="sous h">'+arrondi(groupes[i].heures)+'</td></tr>';
+  }
+  t += '<tr class="tot"><td>TOTAL</td>';
+  for(var k=0;k<mois.length;k++) t += '<td class="h">'+arrondi(totCol[k])+'</td>';
+  t += '<td class="h">'+arrondi(totGen)+'</td></tr></table>';
+  return t;
+}
+
+function ligneDetail(p, avecMois){
+  return '<tr><td>'+esc(p.ouvrier)+'</td>'
+       + (avecMois ? '<td class="txt">'+esc(libelleMois(moisDe(p.date)))+'</td>' : '')
+       + '<td>'+affiche(p.date)+'</td>'
+       + '<td class="txt">'+esc(p.code)+'</td>'
+       + '<td>'+esc(p.chantier)+'</td>'
+       + '<td class="h">'+p.heures+'</td>'
+       + '<td>'+esc(p.notes||"")+'</td></tr>';
+}
+
+/* Detail ligne a ligne, coupe par ouvrier, avec un sous-total apres chaque
+   ouvrier. Le nom reste sur chaque ligne pour rester filtrable dans Excel. */
+function tableauDetail(lignes, avecMois){
+  var nbCol = avecMois ? 7 : 6;
+  var t = '<table><tr><th>Ouvrier</th>'
+        + (avecMois ? '<th>Mois</th>' : '')
+        + '<th>Date</th><th>Code affaire</th><th>Chantier</th><th>Heures</th><th>Notes</th></tr>';
+  var tot = 0, sousTot = 0, sousJours = {}, clefCourante = null, nomCourant = null;
+
+  function fermerGroupe(){
+    if(clefCourante === null) return '';
+    var nb = 0;
+    for(var d in sousJours){ if(Object.prototype.hasOwnProperty.call(sousJours,d)) nb++; }
+    return '<tr class="sous"><td colspan="'+(nbCol-2)+'">Total '+esc(nomCourant)+' &ndash; '+nb+' jour(s)</td>'
+         + '<td class="h">'+arrondi(sousTot)+'</td><td></td></tr>'
+         + '<tr class="vide"><td colspan="'+nbCol+'"></td></tr>';
+  }
+
+  for(var i=0;i<lignes.length;i++){
+    var c = clefOuvrier(lignes[i].ouvrier);
+    if(c !== clefCourante){
+      t += fermerGroupe();
+      clefCourante = c; nomCourant = nomCanonique(lignes[i].ouvrier);
+      sousTot = 0; sousJours = {};
+    }
+    sousTot += lignes[i].heures;
+    sousJours[lignes[i].date] = 1;
+    tot += lignes[i].heures;
+    t += ligneDetail(lignes[i], avecMois);
+  }
+  t += fermerGroupe();
+  t += '<tr class="tot"><td colspan="'+(nbCol-2)+'">TOTAL GÉNÉRAL</td>'
+    +  '<td class="h">'+arrondi(tot)+'</td><td></td></tr></table>';
+  return t;
+}
+
+function titreSection(texte, nbColonnes){
+  return '<table><tr><td class="grp" colspan="'+nbColonnes+'">'+esc(texte)+'</td></tr></table>';
 }
 
 function exportExcelMois(){
@@ -468,24 +590,41 @@ function exportExcelMois(){
     state.message="Aucun pointage en "+libelleMois(ym)+"."; state.typeMessage="err"; dessiner(); return;
   }
   l.sort(triPaie);
-  var recap = tableauRecap(l);
-  var corps = '<table border="1"><tr><td colspan="6"><b>Pointages SP2E &ndash; '+esc(libelleMois(ym))+'</b></td></tr></table><br>'
-            + recap.html + '<br>' + tableauDetail(l);
+  var groupes = regrouperParOuvrier(l);
+  var tot = 0;
+  for(var g=0;g<groupes.length;g++) tot += groupes[g].heures;
+
+  var corps = enTeteClasseur("Pointages " + libelleMois(ym), 3)
+            + titreSection("Total par ouvrier", 3)
+            + tableauRecapMois(groupes) + '<br><br>'
+            + titreSection("Détail des pointages", 6)
+            + tableauDetail(l, false);
+
   telechargerClasseur(corps, "Pointages_"+ym+".xls");
-  state.message = "Export de "+libelleMois(ym)+" : "+recap.nbOuvriers+" ouvrier(s), "
-                + l.length+" ligne(s), "+arrondi(recap.total)+" h au total.";
+  state.message = "Export de "+libelleMois(ym)+" : "+groupes.length+" ouvrier(s), "
+                + l.length+" ligne(s), "+arrondi(tot)+" h au total.";
   state.typeMessage = "ok"; dessiner();
 }
 
-/* Conserve pour les reprises globales (controle, fin d'annee). */
+/* Export global : le total de chaque ouvrier mois par mois, en tableau croise,
+   puis le detail complet. Utile pour les reprises de fin d'annee. */
 function exportExcelTout(){
   if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
   var l = state.pointages.slice().sort(triPaie);
-  var corps = '<table border="1"><tr><td colspan="6"><b>Pointages SP2E &ndash; toutes périodes</b></td></tr></table><br>'
-            + tableauRecap(l).html + '<br>' + tableauDetail(l);
-  telechargerClasseur(corps, "Pointages_toutes-periodes_"+cle(new Date())+".xls");
-}
+  var groupes = regrouperParOuvrier(l);
+  var mois = moisDisponibles().slice().sort();   /* du plus ancien au plus recent */
 
+  var corps = enTeteClasseur("Pointages SP2E – toutes périodes", mois.length + 2)
+            + titreSection("Total par ouvrier et par mois", mois.length + 2)
+            + tableauCroise(groupes, mois) + '<br><br>'
+            + titreSection("Détail des pointages", 7)
+            + tableauDetail(l, true);
+
+  telechargerClasseur(corps, "Pointages_toutes-periodes_"+cle(new Date())+".xls");
+  state.message = "Export global : "+groupes.length+" ouvrier(s), "+mois.length+" mois, "
+                + l.length+" ligne(s).";
+  state.typeMessage = "ok"; dessiner();
+}
 /* ---------- Rendu ---------- */
 function bandeau(){
   if(!state.message) return "";
