@@ -169,7 +169,11 @@ function appeler(donnees){
     return Promise.reject(new Error("L'adresse du serveur n'est pas encore renseignée dans le fichier (variable API_URL)."));
   }
   var controle = ("AbortController" in window) ? new AbortController() : null;
-  var expire = setTimeout(function(){ if(controle) controle.abort(); }, 30000);
+  /* 30 s etait trop court : mesure sur cinq lectures identiques du meme serveur,
+     1,9 s / 2,3 s / 5,9 s / 13,9 s / 34,1 s. Apps Script est irregulier par nature
+     (demarrage a froid, infrastructure mutualisee). A 30 s on abandonnait une
+     requete qui allait aboutir, et l'ouvrier perdait sa saisie. */
+  var expire = setTimeout(function(){ if(controle) controle.abort(); }, 75000);
   var options = { method:"POST", body: JSON.stringify(donnees) };
   if(controle) options.signal = controle.signal;
   return fetch(API_URL, options)
@@ -181,7 +185,7 @@ function appeler(donnees){
     .catch(function(e){
       clearTimeout(expire);
       if(e && e.name === "AbortError"){
-        throw new Error("Le serveur met vraiment trop de temps à répondre (plus de 30 secondes). Vérifiez votre Google Sheet : la ligne a peut-être quand même été enregistrée avant de réessayer.");
+        throw new Error("Le serveur Google n'a pas répondu. Attendez quelques secondes et réessayez : votre saisie n'est pas perdue, mais vérifiez qu'elle n'a pas été enregistrée deux fois.");
       }
       throw e;
     });
@@ -295,12 +299,19 @@ function ajouter(k){
   }
 
   state.occupe = true; state.message = null; dessiner();
-  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h, notes:notes}).then(function(){
+  appeler({action:"ajouter", nom:state.nom, mdp:state.mdp, date:k, code:code, heures:h, notes:notes}).then(function(j){
     state.message = "Enregistré : "+h+" h sur "+code+" - "+nomCh+" ("+affiche(k)+").";
     state.typeMessage = "ok";
-    return chargerMes();
-  }).then(function(){
-    scrollHaut();
+    /* Le serveur renvoie la ligne : on l'affiche sans relancer une requête.
+       Un aller-retour de moins, c'est autant de chances en moins de tomber sur
+       une réponse lente d'Apps Script et de perdre la saisie. */
+    if(j && j.ligne){
+      state.pointages.push(j.ligne);
+      state.occupe = false;
+      dessiner(); scrollHaut();
+      return;
+    }
+    return chargerMes().then(scrollHaut);
   }).catch(erreur);
 }
 function supprimer(id){

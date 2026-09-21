@@ -428,8 +428,16 @@ function traiter(d, a) {
       var ligne = sh.getLastRow() + 1;
       var plage = sh.getRange(ligne, 1, 1, 7);
       plage.setNumberFormats([['@', '@', '@', '@', '@', 'General', '@']]);
-      plage.setValues([[id, String(d.date), u2.nom, ch.code, ch.nom, h, texteNote(d.notes)]]);
-      return reponse({ ok: true, id: id });
+      var note = texteNote(d.notes);
+      plage.setValues([[id, String(d.date), u2.nom, ch.code, ch.nom, h, note]]);
+      /* On renvoie la ligne creee pour que l'application l'affiche directement.
+         Sinon elle doit relancer une requete "mes" juste apres, et le temps de
+         reponse d'Apps Script est trop irregulier (mesure : de 1,9 s a 34 s pour
+         une meme lecture) pour se permettre un aller-retour evitable. */
+      return reponse({ ok: true, id: id, ligne: {
+        id: id, date: String(d.date), ouvrier: u2.nom,
+        code: ch.code, chantier: ch.nom, heures: h, notes: note
+      } });
     }
 
     /* Note du jour, sans ressaisir d'heures : elle est posee sur toutes les lignes
