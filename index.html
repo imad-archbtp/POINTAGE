@@ -122,6 +122,7 @@ function ouvrirPlan(url){
 var state = {
   nom: null, mdp: null, admin: false,
   chantiers: [], pointages: [], ouvriers: [],
+  listeNoms: [], nomsCharges: false,
   lundi: lundiDe(new Date()),
   occupe: false, message: null, typeMessage: "err"
 };
@@ -142,6 +143,9 @@ function affiche(k){ var p = String(k).split("-"); return p[2]+"/"+p[1]+"/"+p[0]
 function jourPlus(d,n){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
 function semaine(l){ var t=[]; for(var i=0;i<6;i++) t.push(jourPlus(l,i)); return t; }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+/* Pour injecter un texte dans un onclick="fn('...')" : on echappe d'abord pour JavaScript
+   (apostrophes des noms type N'Diaye), puis pour le HTML. */
+function escJs(s){ return esc(String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'")); }
 function arrondi(n){ return Math.round(n*100)/100; }
 
 /* ---------- Session (survit au rafraîchissement) ---------- */
@@ -196,10 +200,25 @@ function scrollHaut(){
 }
 
 /* ---------- Actions ---------- */
+/* Recupere la liste des prenoms pour alimenter le menu deroulant de connexion.
+   Objectif : plus personne ne tape son nom a la main, donc plus d'echec de
+   connexion sur une orthographe approchante (Yaacoub / Yaakoub / Yacoub...).
+   Si l'appel echoue, on retombe sur l'ancien champ libre plutot que de bloquer. */
+function chargerNoms(){
+  if(state.nomsCharges) return;
+  state.nomsCharges = true;
+  appeler({action:"ouvriers"}).then(function(j){
+    state.listeNoms = j.ouvriers || [];
+    if(!state.nom && !state.admin) dessiner();
+  }).catch(function(){
+    state.listeNoms = [];
+    if(!state.nom && !state.admin) dessiner();
+  });
+}
 function connexion(){
   var nom = (document.getElementById("f-nom").value||"").trim();
   var mdp = (document.getElementById("f-mdp").value||"").trim();
-  if(!nom || !mdp){ state.message="Saisissez votre nom et votre mot de passe."; state.typeMessage="err"; dessiner(); return; }
+  if(!nom || !mdp){ state.message="Choisissez votre nom et saisissez votre code d'accès."; state.typeMessage="err"; dessiner(); return; }
   state.occupe = true; state.message = null; dessiner();
   appeler({action:"login", nom:nom, mdp:mdp}).then(function(j){
     state.nom = j.nom; state.mdp = mdp; state.admin = false;
@@ -235,6 +254,9 @@ function chargerTous(){
 function deconnexion(){
   state.nom=null; state.mdp=null; state.admin=false;
   state.pointages=[]; state.message=null;
+  // On force le rechargement de la liste : un ouvrier ajoute pendant la session
+  // admin doit apparaitre tout de suite dans le menu de connexion.
+  state.listeNoms=[]; state.nomsCharges=false;
   memoriser(); dessiner();
 }
 function semPrec(){ state.lundi = jourPlus(state.lundi,-7); dessiner(); }
@@ -279,6 +301,44 @@ function supprimer(id){
   appeler(d).then(state.admin ? chargerTous : chargerMes).catch(erreur);
 }
 
+/* ---------- Gestion des ouvriers (admin) ---------- */
+function ajouterOuvrier(){
+  var nom = (document.getElementById("o-nom").value||"").trim();
+  var mdp = (document.getElementById("o-mdp").value||"").trim();
+  if(!nom){ state.message="Saisissez le nom de l'ouvrier."; state.typeMessage="err"; dessiner(); return; }
+  if(mdp.length < 4){ state.message="Le code d'accès doit faire au moins 4 caractères."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"ajouterOuvrier", mdpAdmin:state.mdp, nouveauNom:nom, nouveauMdp:mdp}).then(function(j){
+    state.ouvriers = j.ouvriers;
+    state.message = "Ouvrier ajouté : "+nom+". Transmettez-lui son code d'accès.";
+    state.typeMessage = "ok"; state.occupe = false;
+    dessiner(); scrollHaut();
+  }).catch(erreur);
+}
+function changerCodeOuvrier(nom){
+  var c = prompt("Nouveau code d'accès pour "+nom+" (4 caractères minimum) :");
+  if(c === null) return;
+  c = String(c).trim();
+  if(c.length < 4){ state.message="Le code d'accès doit faire au moins 4 caractères."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"changerMdpOuvrier", mdpAdmin:state.mdp, nouveauNom:nom, nouveauMdp:c}).then(function(j){
+    state.ouvriers = j.ouvriers;
+    state.message = "Code d'accès modifié pour "+nom+".";
+    state.typeMessage = "ok"; state.occupe = false;
+    dessiner(); scrollHaut();
+  }).catch(erreur);
+}
+function retirerOuvrier(nom){
+  if(!confirm("Retirer "+nom+" de la liste ?\n\nSes pointages déjà enregistrés sont conservés : seul son accès à l'application est supprimé.")) return;
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"supprimerOuvrier", mdpAdmin:state.mdp, nouveauNom:nom}).then(function(j){
+    state.ouvriers = j.ouvriers;
+    state.message = nom+" n'a plus accès à l'application.";
+    state.typeMessage = "ok"; state.occupe = false;
+    dessiner(); scrollHaut();
+  }).catch(erreur);
+}
+
 /* ---------- Export Excel (aucune librairie externe) ---------- */
 function exportExcel(){
   if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
@@ -314,8 +374,25 @@ function dessiner(){
   else { app.innerHTML = vueLogin(); var n=document.getElementById("f-nom"); if(n && !state.occupe) n.focus(); }
 }
 
+/* Menu deroulant des ouvriers. Tant que la liste n'est pas arrivee, ou si le serveur
+   n'a pas repondu, on garde l'ancien champ texte : la connexion reste possible. */
+function champNom(d){
+  if(state.listeNoms.length === 0){
+    return '<div class="fg"><label>Nom</label>'
+      + '<input type="text" id="f-nom" autocomplete="username" placeholder="Ex : Nadeem"'+d+'>'
+      + '</div>';
+  }
+  var h = '<div class="fg"><label>Nom</label><select id="f-nom"'+d+'>'
+    + '<option value="">Choisissez votre nom</option>';
+  for(var i=0;i<state.listeNoms.length;i++){
+    h += '<option value="'+esc(state.listeNoms[i])+'">'+esc(state.listeNoms[i])+'</option>';
+  }
+  return h + '</select></div>';
+}
+
 function vueLogin(){
   var d = state.occupe ? " disabled" : "";
+  chargerNoms();
   var avert = API_URL.indexOf("script.google.com") === -1
     ? '<div class="msg msg-warn">L\'adresse du serveur n\'est pas encore renseignée dans le fichier (variable API_URL, tout en haut du script).</div>' : '';
   return ''
@@ -324,8 +401,8 @@ function vueLogin(){
   +     '<div class="sub">Société Parisienne d\'Équipement Électrique</div></div>'
   +   avert + bandeau()
   +   '<h2>Connexion ouvrier</h2>'
-  +   '<div class="fg"><label>Nom</label><input type="text" id="f-nom" autocomplete="username" placeholder="Ex : Nadeem"'+d+'></div>'
-  +   '<div class="fg"><label>Mot de passe</label><input type="password" id="f-mdp" autocomplete="current-password" placeholder="****"'+d+'></div>'
+  +   champNom(d)
+  +   '<div class="fg"><label>Code d\'accès</label><input type="password" id="f-mdp" autocomplete="current-password" placeholder="****"'+d+'></div>'
   +   '<button type="button" class="btn btn-primary" style="width:100%" onclick="connexion()"'+d+'>'+(state.occupe?"Connexion…":"Se connecter")+'</button>'
   +   '<div class="divider"></div>'
   +   '<h2>Accès administrateur</h2>'
@@ -404,6 +481,28 @@ function vueOuvrier(){
   return h;
 }
 
+/* Ajout / retrait des ouvriers depuis l'application, pour ne plus avoir a editer
+   le Google Sheet a la main (c'est la saisie manuelle qui produisait des noms
+   impossibles a retrouver a la connexion). */
+function carteOuvriers(dis){
+  var h = '<div class="card"><h2>Ouvriers (' + state.ouvriers.length + ')</h2>';
+  for(var i=0;i<state.ouvriers.length;i++){
+    var n = state.ouvriers[i];
+    h += '<div class="line"><div class="info"><div class="nom">'+esc(n)+'</div></div>'
+      +  '<button type="button" class="btn btn-secondary btn-note" onclick="changerCodeOuvrier(\''+escJs(n)+'\')"'+dis+'>Changer le code</button> '
+      +  '<button type="button" class="btn btn-danger" onclick="retirerOuvrier(\''+escJs(n)+'\')"'+dis+'>Retirer</button></div>';
+  }
+  if(state.ouvriers.length === 0) h += '<div class="empty">Aucun ouvrier enregistré.</div>';
+  h += '<div class="addrow" style="margin-top:14px">'
+    +    '<input type="text" id="o-nom" placeholder="Nom du nouvel ouvrier"'+dis+'>'
+    +    '<input type="text" id="o-mdp" placeholder="Code d\'accès"'+dis+'>'
+    +    '<button type="button" class="btn btn-primary" onclick="ajouterOuvrier()"'+dis+'>Ajouter</button>'
+    +  '</div>'
+    +  '<div class="hint" style="text-align:left">Le nom saisi ici est celui que l\'ouvrier verra dans la liste au moment de se connecter : il n\'aura rien à taper.</div>'
+    +  '</div>';
+  return h;
+}
+
 function vueAdmin(){
   var l = state.pointages.slice().sort(function(a,b){ return a.date<b.date?1:a.date>b.date?-1:0; });
   var dis = state.occupe ? " disabled" : "";
@@ -418,6 +517,7 @@ function vueAdmin(){
   +   '<button type="button" class="btn btn-admin" onclick="exportExcel()"'+dis+'>Exporter vers Excel</button> '
   +   '<button type="button" class="btn btn-secondary" onclick="chargerTous()"'+dis+'>Actualiser</button>'
   + '</div>'
+  + carteOuvriers(dis)
   + '<div class="card"><h2>Tous les pointages ('+l.length+')</h2>';
 
   if(l.length === 0){
@@ -453,6 +553,7 @@ document.addEventListener("keydown", function(e){
   var id = e.target && e.target.id;
   if(id === "f-admin") connexionAdmin();
   else if(id === "f-nom" || id === "f-mdp") connexion();
+  else if(id === "o-nom" || id === "o-mdp") ajouterOuvrier();
   else if(id && id.indexOf("hr-") === 0) ajouter(id.substring(3));
 });
 
