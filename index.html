@@ -358,26 +358,132 @@ function retirerOuvrier(nom){
 }
 
 /* ---------- Export Excel (aucune librairie externe) ---------- */
-function exportExcel(){
-  if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
-  var l = state.pointages.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
-  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th><th>Chantier</th><th>Heures</th><th>Notes</th></tr>';
-  var tot = 0;
-  for(var i=0;i<l.length;i++){
-    tot += l[i].heures;
-    t += '<tr><td>'+affiche(l[i].date)+'</td><td>'+esc(l[i].ouvrier)+'</td><td>'+esc(l[i].code)
-      +  '</td><td>'+esc(l[i].chantier)+'</td><td>'+l[i].heures+'</td><td>'+esc(l[i].notes||"")+'</td></tr>';
+var MOIS_FR = ["janvier","février","mars","avril","mai","juin",
+               "juillet","août","septembre","octobre","novembre","décembre"];
+function moisDe(dateISO){ return String(dateISO).substring(0,7); }   /* "2026-09-14" -> "2026-09" */
+function libelleMois(ym){
+  var p = String(ym).split("-");
+  var n = parseInt(p[1],10);
+  return (MOIS_FR[n-1] || p[1]) + " " + p[0];
+}
+/* Mois effectivement presents dans les pointages, du plus recent au plus ancien. */
+function moisDisponibles(){
+  var vus = {}, t = [];
+  for(var i=0;i<state.pointages.length;i++){
+    var m = moisDe(state.pointages[i].date);
+    if(m && !vus[m]){ vus[m] = 1; t.push(m); }
   }
-  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td><td></td></tr></table>';
+  t.sort();
+  t.reverse();
+  return t;
+}
+
+function telechargerClasseur(corps, nomFichier){
   var doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
     + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
     + '<x:Name>Pointages</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
-    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>'+t+'</body></html>';
-  var url = URL.createObjectURL(new Blob(["\ufeff"+doc],{type:"application/vnd.ms-excel;charset=utf-8"}));
+    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>'+corps+'</body></html>';
+  /* BOM en tete, sinon Excel affiche les accents en mojibake */
+  var bom = String.fromCharCode(65279);
+  var url = URL.createObjectURL(new Blob([bom+doc],{type:"application/vnd.ms-excel;charset=utf-8"}));
   var a = document.createElement("a");
-  a.href = url; a.download = "Pointages_"+cle(new Date())+".xls";
+  a.href = url; a.download = nomFichier;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+}
+
+/* Meme normalisation que le serveur : "Nadeem", "nadeem" et "NADEEM" doivent compter
+   pour une seule personne. Sans cela, un nom reecrit dans la feuille scinderait le
+   total d'un ouvrier en deux lignes, et la paie ne verrait rien. */
+var RE_ACCENTS = new RegExp('[' + String.fromCharCode(768) + '-' + String.fromCharCode(879) + ']', 'g');
+function clefOuvrier(nom){
+  var s = String(nom == null ? "" : nom);
+  if(s.normalize) s = s.normalize("NFD").replace(RE_ACCENTS, "");
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+/* Orthographe de reference : celle de la fiche ouvrier, sinon celle rencontree. */
+function nomCanonique(nom){
+  var c = clefOuvrier(nom);
+  for(var i=0;i<state.ouvriers.length;i++){
+    if(clefOuvrier(state.ouvriers[i]) === c) return state.ouvriers[i];
+  }
+  return nom;
+}
+
+/* Tri par ouvrier puis par date : c'est l'ordre dans lequel la paie additionne. */
+function triPaie(a,b){
+  var x = clefOuvrier(a.ouvrier), y = clefOuvrier(b.ouvrier);
+  if(x !== y) return x < y ? -1 : 1;
+  return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+}
+
+/* Recapitulatif en tete de fichier : c'est lui que la RH lit. Le detail qui suit
+   ne sert qu'a justifier les totaux. */
+function tableauRecap(lignes){
+  var clefs = [], parClef = {};
+  for(var i=0;i<lignes.length;i++){
+    var c = clefOuvrier(lignes[i].ouvrier);
+    if(!Object.prototype.hasOwnProperty.call(parClef,c)){
+      parClef[c] = { nom: nomCanonique(lignes[i].ouvrier), heures:0, jours:{} };
+      clefs.push(c);
+    }
+    parClef[c].heures += lignes[i].heures;
+    parClef[c].jours[lignes[i].date] = 1;
+  }
+  clefs.sort();
+  var t = '<table border="1"><tr><th>Ouvrier</th><th>Jours travaillés</th><th>Total heures</th></tr>';
+  var tot = 0;
+  for(var k=0;k<clefs.length;k++){
+    var e = parClef[clefs[k]], nb = 0;
+    for(var d in e.jours){ if(Object.prototype.hasOwnProperty.call(e.jours,d)) nb++; }
+    tot += e.heures;
+    t += '<tr><td>'+esc(e.nom)+'</td><td>'+nb+'</td><td>'+arrondi(e.heures)+'</td></tr>';
+  }
+  t += '<tr><td><b>TOTAL</b></td><td></td><td><b>'+arrondi(tot)+'</b></td></tr></table>';
+  return { html: t, total: tot, nbOuvriers: clefs.length };
+}
+
+function tableauDetail(lignes){
+  var t = '<table border="1"><tr><th>Date</th><th>Ouvrier</th><th>Code affaire</th>'
+        + '<th>Chantier</th><th>Heures</th><th>Notes</th></tr>';
+  var tot = 0;
+  for(var i=0;i<lignes.length;i++){
+    tot += lignes[i].heures;
+    t += '<tr><td>'+affiche(lignes[i].date)+'</td><td>'+esc(lignes[i].ouvrier)+'</td><td>'+esc(lignes[i].code)
+      +  '</td><td>'+esc(lignes[i].chantier)+'</td><td>'+lignes[i].heures+'</td><td>'+esc(lignes[i].notes||"")+'</td></tr>';
+  }
+  t += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>'+arrondi(tot)+'</b></td><td></td></tr></table>';
+  return t;
+}
+
+function exportExcelMois(){
+  var sel = document.getElementById("mois-export");
+  var ym = sel ? sel.value : "";
+  if(!ym){ state.message="Choisissez le mois à exporter."; state.typeMessage="err"; dessiner(); return; }
+  var l = [];
+  for(var i=0;i<state.pointages.length;i++){
+    if(moisDe(state.pointages[i].date) === ym) l.push(state.pointages[i]);
+  }
+  if(l.length === 0){
+    state.message="Aucun pointage en "+libelleMois(ym)+"."; state.typeMessage="err"; dessiner(); return;
+  }
+  l.sort(triPaie);
+  var recap = tableauRecap(l);
+  var corps = '<table border="1"><tr><td colspan="6"><b>Pointages SP2E &ndash; '+esc(libelleMois(ym))+'</b></td></tr></table><br>'
+            + recap.html + '<br>' + tableauDetail(l);
+  telechargerClasseur(corps, "Pointages_"+ym+".xls");
+  state.message = "Export de "+libelleMois(ym)+" : "+recap.nbOuvriers+" ouvrier(s), "
+                + l.length+" ligne(s), "+arrondi(recap.total)+" h au total.";
+  state.typeMessage = "ok"; dessiner();
+}
+
+/* Conserve pour les reprises globales (controle, fin d'annee). */
+function exportExcelTout(){
+  if(state.pointages.length === 0){ state.message="Aucun pointage à exporter."; state.typeMessage="err"; dessiner(); return; }
+  var l = state.pointages.slice().sort(triPaie);
+  var corps = '<table border="1"><tr><td colspan="6"><b>Pointages SP2E &ndash; toutes périodes</b></td></tr></table><br>'
+            + tableauRecap(l).html + '<br>' + tableauDetail(l);
+  telechargerClasseur(corps, "Pointages_toutes-periodes_"+cle(new Date())+".xls");
 }
 
 /* ---------- Rendu ---------- */
@@ -503,6 +609,29 @@ function vueOuvrier(){
   return h;
 }
 
+/* Un fichier par mois : l'export unique devenait illisible et obligeait la paie a
+   additionner les heures a la main. Le mois le plus recent est propose par defaut. */
+function carteExport(dis){
+  var mois = moisDisponibles();
+  var h = '<div class="card"><h2>Export pour la paie</h2><div class="addrow">'
+    +    '<select id="mois-export"'+dis+'>';
+  if(mois.length === 0){
+    h += '<option value="">Aucun pointage enregistré</option>';
+  } else {
+    for(var i=0;i<mois.length;i++){
+      h += '<option value="'+esc(mois[i])+'">'+esc(libelleMois(mois[i]))+'</option>';
+    }
+  }
+  h += '</select>'
+    +  '<button type="button" class="btn btn-admin" onclick="exportExcelMois()"'+dis+'>Exporter ce mois</button>'
+    +  '<button type="button" class="btn btn-secondary" onclick="chargerTous()"'+dis+'>Actualiser</button>'
+    +  '</div>'
+    +  '<div class="hint" style="text-align:left">Le fichier s\'ouvre sur le total d\'heures et le nombre de jours travaillés par ouvrier ; le détail ligne à ligne suit, trié par ouvrier puis par date.</div>'
+    +  '<div style="margin-top:12px"><button type="button" class="btn btn-secondary" onclick="exportExcelTout()"'+dis+'>Tout exporter (toutes périodes)</button></div>'
+    +  '</div>';
+  return h;
+}
+
 /* Ajout / retrait des ouvriers depuis l'application, pour ne plus avoir a editer
    le Google Sheet a la main (c'est la saisie manuelle qui produisait des noms
    impossibles a retrouver a la connexion). */
@@ -535,10 +664,7 @@ function vueAdmin(){
   + '</div></div><div class="container">'
   + bandeau()
   + (state.occupe ? '<div class="msg msg-info">Synchronisation en cours…</div>' : '')
-  + '<div class="card">'
-  +   '<button type="button" class="btn btn-admin" onclick="exportExcel()"'+dis+'>Exporter vers Excel</button> '
-  +   '<button type="button" class="btn btn-secondary" onclick="chargerTous()"'+dis+'>Actualiser</button>'
-  + '</div>'
+  + carteExport(dis)
   + carteOuvriers(dis)
   + '<div class="card"><h2>Tous les pointages ('+l.length+')</h2>';
 
@@ -557,9 +683,9 @@ function vueAdmin(){
   }
   h += '</div><div class="card"><h2>Récapitulatif par ouvrier</h2><div class="grid">';
   for(var k=0;k<state.ouvriers.length;k++){
-    var tot=0, nb=0;
+    var tot=0, nb=0, ck=clefOuvrier(state.ouvriers[k]);
     for(var j=0;j<state.pointages.length;j++){
-      if(state.pointages[j].ouvrier === state.ouvriers[k]){ tot += state.pointages[j].heures; nb++; }
+      if(clefOuvrier(state.pointages[j].ouvrier) === ck){ tot += state.pointages[j].heures; nb++; }
     }
     h += '<div class="sum"><div class="n">'+esc(state.ouvriers[k])+'</div>'
       +  '<div class="s">Lignes saisies : <b>'+nb+'</b></div>'
