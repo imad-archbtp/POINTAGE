@@ -3,7 +3,7 @@
   "private": true,
   "description": "Serveur de l'application de pointage chantier SP2E (Cloudflare Worker + D1).",
   "scripts": {
-    "deploy": "wrangler d1 migrations apply sp2e-pointage --remote && wrangler deploy"
+    "deploy": "wrangler d1 migrations apply pointage --remote && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4"

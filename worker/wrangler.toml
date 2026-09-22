@@ -6,7 +6,7 @@
 # Secret a definir une fois dans le tableau de bord (Parametres > Variables > Secrets) :
 #   MDP_ADMIN   mot de passe de l'ecran d'administration
 
-name = "sp2e-pointage"
+name = "pointage"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
@@ -15,7 +15,7 @@ enabled = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "sp2e-pointage"
+database_name = "pointage"
 # Identifiant fourni par Cloudflare a la creation de la base (Stockage > D1).
 database_id = "d4898edf-a50b-4151-b008-4042b6d36398"
 migrations_dir = "migrations"
