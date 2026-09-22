@@ -1,0 +1,21 @@
+# SP2E - Pointage chantier : serveur Cloudflare Worker + base D1.
+#
+# Deploiement : Cloudflare > Workers > "Connecter un depot GitHub", dossier racine `worker`.
+# Chaque push sur `main` applique les migrations puis met le Worker en ligne.
+#
+# Secret a definir une fois dans le tableau de bord (Parametres > Variables > Secrets) :
+#   MDP_ADMIN   mot de passe de l'ecran d'administration
+
+name = "sp2e-pointage"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sp2e-pointage"
+# Identifiant fourni par Cloudflare a la creation de la base (Stockage > D1).
+database_id = "A_REMPLACER_APRES_CREATION"
+migrations_dir = "migrations"
