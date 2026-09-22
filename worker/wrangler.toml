@@ -17,5 +17,5 @@ enabled = true
 binding = "DB"
 database_name = "sp2e-pointage"
 # Identifiant fourni par Cloudflare a la creation de la base (Stockage > D1).
-database_id = "A_REMPLACER_APRES_CREATION"
+database_id = "d4898edf-a50b-4151-b008-4042b6d36398"
 migrations_dir = "migrations"
