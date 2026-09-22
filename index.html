@@ -95,10 +95,11 @@ tr:hover td{background:#fafafa}
 "use strict";
 
 /* ============================================================
-   >>> COLLEZ ICI L'ADRESSE DE VOTRE APPLICATION GOOGLE APPS SCRIPT
-   Elle ressemble à : https://script.google.com/macros/s/AKfy..../exec
+   Adresse du serveur : Cloudflare Worker "pointage" (dossier worker/ du depot).
+   L'ancien serveur Google Apps Script reste joignable en secours :
+   https://script.google.com/macros/s/AKfycbwTA4ndRHBniI7kkQtYzfYbIb03ipaBEyh-qlzORKdtV7l8Gjo4u429rcf8lPKZI6ES/exec
    ============================================================ */
-var API_URL = "https://script.google.com/macros/s/AKfycbwTA4ndRHBniI7kkQtYzfYbIb03ipaBEyh-qlzORKdtV7l8Gjo4u429rcf8lPKZI6ES/exec";
+var API_URL = "https://pointage.imad94mail.workers.dev/";
 /* ============================================================ */
 
 /* Les PDF des plans sont hébergés dans le même dépôt GitHub (dossier /plans/<code>/),
@@ -165,15 +166,14 @@ function reprendre(){
 
 /* ---------- Appel serveur ---------- */
 function appeler(donnees){
-  if(API_URL.indexOf("script.google.com") === -1){
-    return Promise.reject(new Error("L'adresse du serveur n'est pas encore renseignée dans le fichier (variable API_URL)."));
+  if(!/^https:\/\//.test(API_URL)){
+    return Promise.reject(new Error("L'adresse du serveur n'est pas renseignée dans le fichier (variable API_URL)."));
   }
   var controle = ("AbortController" in window) ? new AbortController() : null;
-  /* 30 s etait trop court : mesure sur cinq lectures identiques du meme serveur,
-     1,9 s / 2,3 s / 5,9 s / 13,9 s / 34,1 s. Apps Script est irregulier par nature
-     (demarrage a froid, infrastructure mutualisee). A 30 s on abandonnait une
-     requete qui allait aboutir, et l'ouvrier perdait sa saisie. */
-  var expire = setTimeout(function(){ if(controle) controle.abort(); }, 75000);
+  /* Le serveur Cloudflare repond en quelques dizaines de millisecondes ; 25 s
+     couvre largement une 4G de chantier. (L'ancien serveur Google exigeait 75 s
+     tant il etait irregulier : de 1,9 s a 34 s pour une meme lecture.) */
+  var expire = setTimeout(function(){ if(controle) controle.abort(); }, 25000);
   var options = { method:"POST", body: JSON.stringify(donnees) };
   if(controle) options.signal = controle.signal;
   return fetch(API_URL, options)
@@ -374,6 +374,45 @@ function retirerOuvrier(nom){
   appeler({action:"supprimerOuvrier", mdpAdmin:state.mdp, nouveauNom:nom}).then(function(j){
     state.ouvriers = j.ouvriers;
     state.message = nom+" n'a plus accès à l'application.";
+    state.typeMessage = "ok"; state.occupe = false;
+    dessiner(); scrollHaut();
+  }).catch(erreur);
+}
+
+/* ---------- Gestion des chantiers (admin) ----------
+   Il n'y a plus de classeur Google a editer a la main : les chantiers se gerent
+   ici. Les PDF des plans restent dans le depot GitHub, dossier plans/<code>/. */
+function preremplirChantier(code){
+  for(var i=0;i<state.chantiers.length;i++){
+    if(state.chantiers[i].code === code){
+      document.getElementById("c-code").value = state.chantiers[i].code;
+      document.getElementById("c-nom").value = state.chantiers[i].nom;
+      document.getElementById("c-plans").value = state.chantiers[i].plans.join(", ");
+      document.getElementById("c-nom").focus();
+      return;
+    }
+  }
+}
+function enregistrerChantier(){
+  var code = (document.getElementById("c-code").value||"").trim();
+  var nom = (document.getElementById("c-nom").value||"").trim();
+  var plans = (document.getElementById("c-plans").value||"").trim();
+  if(!code){ state.message="Saisissez le code affaire."; state.typeMessage="err"; dessiner(); return; }
+  if(!nom){ state.message="Saisissez le nom du chantier."; state.typeMessage="err"; dessiner(); return; }
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"enregistrerChantier", mdpAdmin:state.mdp, code:code, nom:nom, plans:plans}).then(function(j){
+    state.chantiers = j.chantiers;
+    state.message = "Chantier enregistré : "+code+" - "+nom+".";
+    state.typeMessage = "ok"; state.occupe = false;
+    dessiner(); scrollHaut();
+  }).catch(erreur);
+}
+function retirerChantier(code){
+  if(!confirm("Retirer le chantier "+code+" de la liste ?\n\nLes pointages déjà saisis dessus sont conservés.")) return;
+  state.occupe = true; state.message = null; dessiner();
+  appeler({action:"supprimerChantier", mdpAdmin:state.mdp, code:code}).then(function(j){
+    state.chantiers = j.chantiers;
+    state.message = "Chantier "+code+" retiré de la liste.";
     state.typeMessage = "ok"; state.occupe = false;
     dessiner(); scrollHaut();
   }).catch(erreur);
@@ -678,8 +717,8 @@ function champNom(d){
 function vueLogin(){
   var d = state.occupe ? " disabled" : "";
   chargerNoms();
-  var avert = API_URL.indexOf("script.google.com") === -1
-    ? '<div class="msg msg-warn">L\'adresse du serveur n\'est pas encore renseignée dans le fichier (variable API_URL, tout en haut du script).</div>' : '';
+  var avert = !/^https:\/\//.test(API_URL)
+    ? '<div class="msg msg-warn">L\'adresse du serveur n\'est pas renseignée dans le fichier (variable API_URL, tout en haut du script).</div>' : '';
   return ''
   + '<div class="login">'
   +   '<div class="logo"><div class="logo-text"><span class="logo-a">SP</span><span class="logo-b">2E</span></div>'
@@ -793,6 +832,29 @@ function carteExport(dis){
   return h;
 }
 
+function carteChantiers(dis){
+  var h = '<div class="card"><h2>Chantiers (' + state.chantiers.length + ')</h2>';
+  for(var i=0;i<state.chantiers.length;i++){
+    var c = state.chantiers[i];
+    h += '<div class="line"><div class="info"><div class="code">'+esc(c.code)+'</div><div class="nom">'+esc(c.nom)+'</div>'
+      +  '<div class="notes">'+(c.plans.length ? esc(c.plans.join(', ')) : 'Aucun plan')+'</div></div>'
+      +  '<button type="button" class="btn btn-secondary btn-note" onclick="preremplirChantier(\''+escJs(c.code)+'\')"'+dis+'>Modifier</button> '
+      +  '<button type="button" class="btn btn-danger" onclick="retirerChantier(\''+escJs(c.code)+'\')"'+dis+'>Retirer</button></div>';
+  }
+  if(state.chantiers.length === 0) h += '<div class="empty">Aucun chantier.</div>';
+  h += '<div class="addrow" style="margin-top:14px">'
+    +    '<input type="text" id="c-code" placeholder="Code affaire (ex : 016)" style="flex:1;min-width:120px"'+dis+'>'
+    +    '<input type="text" id="c-nom" placeholder="Nom du chantier" style="flex:2"'+dis+'>'
+    +  '</div>'
+    +  '<div class="addrow" style="margin-top:8px">'
+    +    '<input type="text" id="c-plans" placeholder="Fichiers PDF des plans, séparés par des virgules (optionnel)" style="flex:3"'+dis+'>'
+    +    '<button type="button" class="btn btn-primary" onclick="enregistrerChantier()"'+dis+'>Enregistrer</button>'
+    +  '</div>'
+    +  '<div class="hint" style="text-align:left">Un code déjà présent met le chantier à jour. Les PDF se déposent dans le dépôt GitHub, dossier plans/&lt;code&gt;/.</div>'
+    +  '</div>';
+  return h;
+}
+
 /* Ajout / retrait des ouvriers depuis l'application, pour ne plus avoir a editer
    le Google Sheet a la main (c'est la saisie manuelle qui produisait des noms
    impossibles a retrouver a la connexion). */
@@ -827,6 +889,7 @@ function vueAdmin(){
   + (state.occupe ? '<div class="msg msg-info">Synchronisation en cours…</div>' : '')
   + carteExport(dis)
   + carteOuvriers(dis)
+  + carteChantiers(dis)
   + '<div class="card"><h2>Tous les pointages ('+l.length+')</h2>';
 
   if(l.length === 0){
@@ -863,6 +926,7 @@ document.addEventListener("keydown", function(e){
   if(id === "f-admin") connexionAdmin();
   else if(id === "f-nom" || id === "f-mdp") connexion();
   else if(id === "o-nom" || id === "o-mdp") ajouterOuvrier();
+  else if(id === "c-code" || id === "c-nom" || id === "c-plans") enregistrerChantier();
   else if(id && id.indexOf("hr-") === 0) ajouter(id.substring(3));
 });
 

@@ -2,45 +2,42 @@
 
 Application de pointage pour les chantiers SP2E.
 
-## Les deux moitiés de l'application
+## Architecture
 
 | | Où | Quoi |
 |---|---|---|
-| **Front** | ce dépôt, `index.html` | page unique, servie par GitHub Pages sur https://imad-archbtp.github.io/POINTAGE/ |
-| **Back** | Google Apps Script lié au classeur « SP2E - Pointages » | `Code.gs`, copie de référence conservée ici |
-| **Données** | onglets `Ouvriers`, `Chantiers`, `Pointages` du classeur | |
+| **Front** | `index.html` à la racine | page unique, servie par GitHub Pages sur https://imad-archbtp.github.io/POINTAGE/ |
+| **Serveur** | `worker/` | Cloudflare Worker `pointage` — https://pointage.imad94mail.workers.dev/ |
+| **Base** | Cloudflare D1 `sp2e-pointage` | tables `ouvriers`, `chantiers`, `pointages` (schéma dans `worker/migrations/`) |
 | **Plans** | `plans/<code affaire>/*.pdf` | servis par GitHub Pages comme la page |
 
-`Code.gs` est une **copie** : la version qui tourne réellement est celle collée dans l'éditeur Apps Script. Après toute modification, recopier le fichier des deux côtés.
+Le front et le serveur échangent en JSON : un `POST` avec `{action, ...}`, une réponse `{ok, ...}`.
 
 ## Publier une modification
 
-**Front** : pousser sur `main`. GitHub Pages reconstruit en une minute environ.
+Tout part d'un push sur `main` :
 
-**Back** : enregistrer dans l'éditeur Apps Script **ne suffit pas**. L'URL `/exec` sert une version figée. Il faut :
+- **Front** : GitHub Pages reconstruit en une minute environ.
+- **Serveur** : Cloudflare (Workers Builds) applique les migrations D1 puis déploie le Worker. Réglages dans le tableau de bord Cloudflare, Worker `pointage` → Settings → Builds : dossier racine `worker`, commande de déploiement `npx wrangler d1 migrations apply sp2e-pointage --remote && npx wrangler deploy`.
 
-> Déployer → Gérer les déploiements → crayon → Version : **Nouvelle version** → Déployer
-
-L'identifiant de déploiement ne change pas, donc l'`API_URL` d'`index.html` reste valable. Sauter cette étape est le piège classique : le code est sauvegardé, mais l'application continue de servir l'ancien.
+Pour modifier le schéma de la base : ajouter un fichier `worker/migrations/000N_description.sql`. Il sera appliqué une seule fois, au prochain déploiement.
 
 ## Mot de passe administrateur
 
-Il n'est **pas** dans le code. Il est lu dans les propriétés du script :
+Secret `MDP_ADMIN` du Worker (Cloudflare → `pointage` → Settings → Variables and Secrets). Il n'est jamais dans le code. Tant qu'il n'est pas défini, l'accès administrateur est refusé.
 
-> Paramètres du projet → Propriétés du script → `MDP_ADMIN`
+## Codes d'accès des ouvriers
 
-Tant que la propriété est vide, l'accès administrateur est refusé. C'est volontaire : ce dépôt est public, et un mot de passe écrit dans le code resterait visible dans tout l'historique des versions même après avoir été retiré.
+Jamais stockés en clair : la base ne conserve qu'une empreinte SHA-256 salée. On ne peut donc pas *lire* un code perdu, seulement en définir un nouveau depuis **Administration → Ouvriers → Changer le code**.
 
-## Ajouter un salarié
+## Gérer ouvriers et chantiers
 
-Par l'écran **Administration → Ouvriers**. Ne pas éditer le classeur à la main : c'est la saisie manuelle des noms qui a produit des comptes impossibles à retrouver au moment de la connexion.
+Uniquement depuis l'écran **Administration**. Il n'y a plus de feuille Google à éditer à la main. Retirer un ouvrier ou un chantier ne supprime jamais les pointages déjà saisis.
 
-## Fonctions de maintenance
+## Données
 
-À exécuter depuis l'éditeur Apps Script, une seule fois, uniquement si besoin :
+D1 conserve 30 jours d'historique (Time Travel) : toute erreur se rattrape depuis le tableau de bord Cloudflare, `sp2e-pointage` → Time Travel. L'export Excel mensuel reste le document de référence pour la paie.
 
-- `migrer()` — ajoute l'en-tête `notes` en colonne G de `Pointages` et passe les codes d'accès en texte
-- `reparerDonnees()` — restaure les codes affaire ayant perdu leur zéro de tête (`016` devenu `16`) et les dates converties en date/heure
-- `reparerMotsDePasse()` — repasse la colonne des codes en texte sans changer aucune valeur
+## Ancien serveur (Google Apps Script)
 
-⚠️ `initialiser()` **efface et recrée les trois onglets**. Réservée à un classeur vierge.
+`Code.gs` est conservé à titre d'archive. Le classeur « SP2E - Pointages » et son script restent joignables en secours pendant la période de transition, puis seront désactivés. Ils ne reçoivent plus les nouveaux pointages.
