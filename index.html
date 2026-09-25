@@ -125,7 +125,8 @@ var state = {
   chantiers: [], pointages: [], ouvriers: [],
   listeNoms: [], nomsCharges: false,
   lundi: lundiDe(new Date()),
-  occupe: false, message: null, typeMessage: "err"
+  occupe: false, message: null, typeMessage: "err",
+  erreurJour: null
 };
 var JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 
@@ -185,19 +186,46 @@ function appeler(donnees){
     .catch(function(e){
       clearTimeout(expire);
       if(e && e.name === "AbortError"){
-        throw new Error("Le serveur Google n'a pas répondu. Attendez quelques secondes et réessayez : votre saisie n'est pas perdue, mais vérifiez qu'elle n'a pas été enregistrée deux fois.");
+        throw new Error("Le serveur n'a pas répondu. Vérifiez votre réseau puis réessayez, et contrôlez que la ligne n'a pas été enregistrée deux fois.");
       }
       throw e;
     });
 }
-function erreur(e){
+function texteErreur(e){
   var m = e && e.message ? e.message : String(e);
   if(/Failed to fetch|NetworkError|Load failed/i.test(m)){
     m = "Connexion impossible. Vérifiez votre réseau, puis réessayez.";
   }
-  state.message = m; state.typeMessage = "err";
+  return m;
+}
+function erreur(e){
+  state.message = texteErreur(e); state.typeMessage = "err";
   state.occupe = false; dessiner();
   scrollHaut();
+}
+/* Erreur d'une saisie d'heures : affichee SOUS la journee concernee, avec les
+   champs remplis tels que l'ouvrier les avait laisses. Auparavant le message
+   partait en haut de page, hors de l'ecran du telephone, et les champs se
+   vidaient : l'ouvrier avait l'impression que « Ajouter » ne faisait rien. */
+function erreurDuJour(k, texte, code, heures, notes){
+  state.erreurJour = { jour:k, texte:texte, code:code, heures:heures, notes:notes };
+  state.message = null; state.occupe = false; dessiner();
+  var el = document.getElementById("er-"+k);
+  if(el){ try{ el.scrollIntoView({block:"center", behavior:"smooth"}); }catch(x){ el.scrollIntoView(); } }
+}
+/* Heures saisies au telephone : 7 / 7,5 / 7.5 / 7h / 7h30. Le champ est en texte
+   (et non en nombre) car un champ numerique renvoie une valeur vide quand le
+   clavier du telephone met une virgule que le navigateur ne reconnait pas. */
+function lireHeures(brut){
+  var s = String(brut == null ? "" : brut).toLowerCase().replace(/\s+/g, "");
+  var m = /^(\d{1,2})h(\d{1,2})?$/.exec(s);
+  if(m){
+    var mn = m[2] ? parseInt(m[2], 10) : 0;
+    if(mn > 59) return NaN;
+    return Math.round((parseInt(m[1], 10) + mn/60) * 100) / 100;
+  }
+  if(/^\d{1,2}([.,]\d{1,2})?$/.test(s)) return parseFloat(s.replace(",", "."));
+  return NaN;
 }
 function scrollHaut(){
   try{ window.scrollTo({top:0, behavior:"smooth"}); }catch(e){ window.scrollTo(0,0); }
@@ -268,23 +296,26 @@ function chargerTous(){
 }
 function deconnexion(){
   state.nom=null; state.mdp=null; state.admin=false;
-  state.pointages=[]; state.message=null;
+  state.pointages=[]; state.message=null; state.erreurJour=null;
   // On force le rechargement de la liste : un ouvrier ajoute pendant la session
   // admin doit apparaitre tout de suite dans le menu de connexion.
   state.listeNoms=[]; state.nomsCharges=false;
   memoriser(); dessiner();
 }
-function semPrec(){ state.lundi = jourPlus(state.lundi,-7); dessiner(); }
-function semSuiv(){ state.lundi = jourPlus(state.lundi,7); dessiner(); }
-function semAuj(){ state.lundi = lundiDe(new Date()); dessiner(); }
+function semPrec(){ state.lundi = jourPlus(state.lundi,-7); state.erreurJour = null; dessiner(); }
+function semSuiv(){ state.lundi = jourPlus(state.lundi,7); state.erreurJour = null; dessiner(); }
+function semAuj(){ state.lundi = lundiDe(new Date()); state.erreurJour = null; dessiner(); }
 
 function ajouter(k){
   var sel = document.getElementById("ch-"+k), inp = document.getElementById("hr-"+k), ntEl = document.getElementById("nt-"+k);
   var code = sel.value;
-  var h = parseFloat(String(inp.value).replace(",","."));
+  var saisie = String(inp.value||"");
+  var h = lireHeures(saisie);
   var notes = ntEl ? (ntEl.value||"").trim().substring(0,200) : "";
-  if(!code){ state.message="Choisissez un chantier."; state.typeMessage="err"; dessiner(); return; }
-  if(!(h>0) || h>24){ state.message="Saisissez un nombre d'heures valide (ex : 8 ou 7.5)."; state.typeMessage="err"; dessiner(); return; }
+  var noteBrute = ntEl ? (ntEl.value||"") : "";
+  state.erreurJour = null;
+  if(!code){ erreurDuJour(k, "Choisissez d'abord un chantier dans la liste, puis appuyez sur Ajouter.", code, saisie, noteBrute); return; }
+  if(!(h>0) || h>24){ erreurDuJour(k, "Nombre d'heures non reconnu. Écrivez par exemple 7, 7,5 ou 7h30.", code, saisie, noteBrute); return; }
 
   var nomCh = "";
   for(var n=0;n<state.chantiers.length;n++) if(state.chantiers[n].code===code) nomCh = state.chantiers[n].nom;
@@ -312,9 +343,12 @@ function ajouter(k){
       return;
     }
     return chargerMes().then(scrollHaut);
-  }).catch(erreur);
+  }).catch(function(e){
+    erreurDuJour(k, texteErreur(e), code, saisie, noteBrute);
+  });
 }
 function supprimer(id){
+  state.erreurJour = null;
   if(!confirm("Supprimer cette ligne ?")) return;
   state.occupe = true; state.message = null; dessiner();
   var d = state.admin
@@ -327,6 +361,7 @@ function supprimer(id){
    saisies ce jour-la. Ce bouton appelait "ajouter", qui exigeait un chantier et des
    heures, et repondait donc invariablement "Choisissez un chantier". */
 function validerNote(k){
+  state.erreurJour = null;
   var el = document.getElementById("nt-"+k);
   var notes = el ? (el.value||"").trim().substring(0,200) : "";
   state.occupe = true; state.message = null; dessiner();
@@ -776,14 +811,17 @@ function vueOuvrier(){
         +  '<div class="h">'+duJour[m].heures+' h</div>'
         +  '<button type="button" class="btn btn-danger" onclick="supprimer(\''+esc(duJour[m].id)+'\')"'+dis+'>Supprimer</button></div>';
     }
+    var ej = (state.erreurJour && state.erreurJour.jour === k) ? state.erreurJour : null;
+    if(ej) h += '<div class="msg msg-err" id="er-'+k+'" role="alert">'+esc(ej.texte)+'</div>';
     h += '<div class="addrow"><select id="ch-'+k+'"'+dis+'><option value="">Choisir un chantier</option>';
     for(var n=0;n<state.chantiers.length;n++){
-      h += '<option value="'+esc(state.chantiers[n].code)+'">'+esc(state.chantiers[n].code+" - "+state.chantiers[n].nom)+'</option>';
+      var choisi = (ej && ej.code === state.chantiers[n].code) ? ' selected' : '';
+      h += '<option value="'+esc(state.chantiers[n].code)+'"'+choisi+'>'+esc(state.chantiers[n].code+" - "+state.chantiers[n].nom)+'</option>';
     }
-    h += '</select><input type="number" id="hr-'+k+'" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Heures"'+dis+'>'
+    h += '</select><input type="text" id="hr-'+k+'" inputmode="decimal" autocomplete="off" maxlength="6" placeholder="Heures" value="'+(ej ? esc(ej.heures) : '')+'"'+dis+'>'
       +  '<button type="button" class="btn btn-primary" onclick="ajouter(\''+k+'\')"'+dis+'>Ajouter</button></div>'
       +  '<div class="noterow">'
-      +    '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'>'+esc(noteJour)+'</textarea>'
+      +    '<textarea id="nt-'+k+'" class="notes-input" maxlength="200" rows="2" placeholder="Notes du jour (optionnel, 200 caractères max) : ce qui a été fait, matériel utilisé, remarques…"'+dis+'>'+esc(ej ? ej.notes : noteJour)+'</textarea>'
       +    '<button type="button" class="btn btn-secondary btn-note" onclick="validerNote(\''+k+'\')"'+dis+'>Valider la note</button>'
       +  '</div>'
       +  '</div>';
